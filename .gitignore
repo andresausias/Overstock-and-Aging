@@ -1,0 +1,31 @@
+# Environment & secrets
+.env
+credentials.json
+token.json
+
+# Temporary processing files
+.tmp/
+
+# Output folder (generated deliverables — not committed)
+output/
+
+# Input data files (keep folder structure, not the data)
+input/aging/*
+input/reference/*
+input/shipments/*
+!input/aging/.gitkeep
+!input/reference/.gitkeep
+!input/shipments/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# macOS
+.DS_Store
+
+# Node
+node_modules/

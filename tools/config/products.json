@@ -1,0 +1,69 @@
+{
+  "_comment": "Per-product metadata. subtitle, action, inventory_units, section (overstock/aging). Update as needed.",
+  "10022 Bra": {
+    "section": "overstock",
+    "subtitle": "Update % of Total Overstock here",
+    "action": "Update action/strategy text here",
+    "inventory_units": null
+  },
+  "10024 Straps Bra": {
+    "section": "overstock",
+    "subtitle": "Update % of Total Overstock here",
+    "action": "Update action/strategy text here",
+    "inventory_units": null
+  },
+  "10035 Sweetheart Bra": {
+    "section": "overstock",
+    "subtitle": "Update % of Total Overstock here",
+    "action": "Update action/strategy text here",
+    "inventory_units": null
+  },
+  "42075 HW Legging": {
+    "section": "overstock",
+    "subtitle": "Update % of Total Overstock here",
+    "action": "Update action/strategy text here",
+    "inventory_units": null
+  },
+  "62001 Scoop Neck Cami": {
+    "section": "overstock",
+    "subtitle": "Update % of Total Overstock here",
+    "action": "Update action/strategy text here",
+    "inventory_units": null
+  },
+  "10400 Silicone Band": {
+    "section": "aging",
+    "subtitle": "Update units | % Aging here",
+    "action": "Update action/strategy text here",
+    "inventory_units": null
+  },
+  "10210 Old Labs": {
+    "section": "aging",
+    "subtitle": "Update units | % Aging here",
+    "action": "Update action/strategy text here",
+    "inventory_units": null
+  },
+  "10210 New Labs": {
+    "section": "aging",
+    "subtitle": "Update units | % Aging here",
+    "action": "Update action/strategy text here",
+    "inventory_units": null
+  },
+  "10210 Extended": {
+    "section": "aging",
+    "subtitle": "Update units | % Aging here",
+    "action": "Update action/strategy text here",
+    "inventory_units": null
+  },
+  "Bad Lots": {
+    "section": "aging",
+    "subtitle": "Update units | % Aging here",
+    "action": "Update action/strategy text here",
+    "inventory_units": null
+  },
+  "EMP Brand": {
+    "section": "aging",
+    "subtitle": "Update units | % Aging here",
+    "action": "Update action/strategy text here",
+    "inventory_units": null
+  }
+}

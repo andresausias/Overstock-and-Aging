@@ -1,0 +1,14 @@
+{
+  "_comment": "Lever strategy per product/segment. Update when strategy changes.",
+  "10022 Bra": "BOOST+CLR",
+  "10024 Straps Bra": "ACQ+CLR",
+  "10035 Sweetheart Bra": "ACQ+CLR",
+  "42075 HW Legging": "CLR ONLY",
+  "62001 Scoop Neck Cami": "ACQ+CLR+BOOST",
+  "10400 Silicone Band": "ACQ",
+  "10210 Old Labs": "ACQ+CLR",
+  "10210 New Labs": "ACQ+CLR",
+  "10210 Extended": "ACQ+CLR",
+  "Bad Lots": "BOOST+CLR",
+  "EMP Brand": "ACQ+CLR+BOOST"
+}

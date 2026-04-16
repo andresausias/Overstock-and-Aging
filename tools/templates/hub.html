@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Overstock & Aging Inventory Management Hub</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #f1f5f9; font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; min-height: 100vh; }
+
+  /* ── Layout ── */
+  .layout { display: flex; min-height: 100vh; }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 260px; min-width: 260px; background: #1e293b;
+    display: flex; flex-direction: column;
+    position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  }
+  .sidebar-brand {
+    padding: 22px 18px 18px;
+    background: linear-gradient(160deg, #1a237e 0%, #283593 100%);
+    border-bottom: 1px solid #334155;
+  }
+  .sidebar-brand h2 { font-size: 14px; font-weight: 700; color: #fff; letter-spacing: 0.3px; }
+  .sidebar-brand p { font-size: 10px; color: rgba(255,255,255,0.5); margin-top: 3px; }
+
+  .nav-section { padding: 4px 12px 2px; }
+  /* Top-level group (Aging, Overstock, Performance Tracker) */
+  .nav-group { margin: 6px 0 2px; }
+  .nav-group-label {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.2px;
+    color: #fff; padding: 8px 10px; margin: 0 0 2px;
+    cursor: pointer; border-radius: 6px; user-select: none;
+    background: #0f172a; transition: background 0.12s;
+  }
+  .nav-group-label:hover { background: #1e3a5f; }
+  .nav-group-label .nav-chevron { font-size: 9px; transition: transform 0.2s; }
+  .nav-group-label.collapsed .nav-chevron { transform: rotate(-90deg); }
+  .nav-group-body { overflow: hidden; transition: max-height 0.35s ease; max-height: 600px; padding-left: 8px; }
+  .nav-group-body.collapsed { max-height: 0; }
+  /* Sub-section label inside a group */
+  .nav-label {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+    color: #94a3b8; padding: 5px 8px; margin-bottom: 2px;
+    cursor: pointer; border-radius: 5px; user-select: none;
+    transition: background 0.12s;
+  }
+  .nav-label:hover { background: #334155; color: #fff; }
+  .nav-label .nav-chevron { font-size: 8px; transition: transform 0.2s; }
+  .nav-label.collapsed .nav-chevron { transform: rotate(-90deg); }
+  .nav-section-body { overflow: hidden; transition: max-height 0.25s ease; max-height: 400px; }
+  .nav-section-body.collapsed { max-height: 0; }
+  .nav-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; border-radius: 6px; font-size: 12px; color: #94a3b8;
+    cursor: pointer; border: none; background: none; width: 100%; text-align: left;
+    transition: background 0.12s, color 0.12s;
+  }
+  .nav-item:hover { background: #334155; color: #e2e8f0; }
+  .nav-item.active { background: #1a237e; color: #fff; }
+  .nav-item .icon { font-size: 14px; width: 18px; text-align: center; flex-shrink: 0; }
+  .nav-divider { border: none; border-top: 1px solid #334155; margin: 8px 12px; }
+
+  .badge {
+    display: inline-block; font-size: 9px; font-weight: 700;
+    padding: 1px 5px; border-radius: 3px; margin-left: auto;
+  }
+  .badge-mom  { background: #1e40af; color: #bfdbfe; }
+  .badge-evac { background: #6d28d9; color: #ede9fe; }
+  .badge-new  { background: #065f46; color: #a7f3d0; }
+
+  .sidebar-footer {
+    margin-top: auto; padding: 12px 18px;
+    border-top: 1px solid #334155;
+    font-size: 10px; color: #475569;
+  }
+
+  /* ── Main ── */
+  .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+  /* ── Page header ── */
+  .page-header {
+    background: #fff; border-bottom: 1px solid #e2e8f0;
+    padding: 18px 28px; display: flex; align-items: center; justify-content: space-between;
+  }
+  .page-header h1 { font-size: 20px; font-weight: 700; color: #0f172a; }
+  .page-header p  { font-size: 12px; color: #64748b; margin-top: 2px; }
+  .header-latest {
+    display: flex; gap: 20px;
+  }
+  .header-kpi { text-align: right; }
+  .header-kpi .val { font-size: 20px; font-weight: 700; color: #1a237e; }
+  .header-kpi .lbl { font-size: 10px; color: #64748b; }
+  .header-kpi .delta { font-size: 11px; font-weight: 600; margin-top: 1px; }
+  .delta-up   { color: #dc2626; }
+  .delta-down { color: #16a34a; }
+  .delta-flat { color: #94a3b8; }
+
+  /* ── Tab bar ── */
+  .tab-bar {
+    display: flex; background: #fff; border-bottom: 1px solid #e2e8f0; padding: 0 28px;
+  }
+  .tab-btn {
+    padding: 13px 18px; font-size: 13px; font-weight: 600;
+    color: #64748b; background: none; border: none;
+    border-bottom: 2px solid transparent; cursor: pointer; transition: color 0.12s;
+  }
+  .tab-btn:hover { color: #0f172a; }
+  .tab-btn.active { color: #1a237e; border-bottom-color: #1a237e; }
+  .tab-panel { display: none; flex: 1; flex-direction: column; }
+  .tab-panel.active { display: flex; }
+
+  /* ── Overview scroll area ── */
+  .overview { flex: 1; overflow-y: auto; padding: 24px 28px; }
+
+  /* ── Month timeline strip ── */
+  .month-strip { display: flex; gap: 14px; margin-bottom: 24px; flex-wrap: wrap; }
+  .month-card {
+    flex: 1; min-width: 160px; background: #fff; border-radius: 10px;
+    padding: 16px 18px; border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    cursor: pointer; transition: box-shadow 0.15s, border-color 0.15s;
+  }
+  .month-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); border-color: #c7d2fe; }
+  .month-card.latest { border-color: #6366f1; border-width: 2px; }
+  .month-card .mc-label { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .month-card .mc-val  { font-size: 22px; font-weight: 700; color: #1a237e; }
+  .month-card .mc-sub  { font-size: 11px; color: #64748b; margin-top: 2px; }
+  .month-card .mc-delta { font-size: 11px; font-weight: 600; margin-top: 6px; display: flex; align-items: center; gap: 4px; }
+
+  /* ── Trend chart card ── */
+  .card {
+    background: #fff; border-radius: 10px; padding: 20px 22px;
+    border: 1px solid #e2e8f0; margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .card-title { font-size: 14px; font-weight: 700; color: #0f172a; }
+  .chart-toggle { display: flex; gap: 6px; }
+  .toggle-btn {
+    padding: 4px 12px; font-size: 11px; font-weight: 600; border-radius: 4px;
+    cursor: pointer; border: 1px solid #e2e8f0; background: #f8fafc; color: #64748b;
+    transition: all 0.12s;
+  }
+  .toggle-btn.on { background: #1a237e; color: #fff; border-color: #1a237e; }
+  .chart-wrap { position: relative; height: 280px; }
+
+  /* ── Report cards grid ── */
+  .reports-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+  .report-card {
+    background: #fff; border-radius: 10px; padding: 18px 20px;
+    border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    display: flex; flex-direction: column; gap: 12px;
+    transition: box-shadow 0.15s, border-color 0.15s;
+  }
+  .report-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); border-color: #c7d2fe; }
+  .rc-type-row { display: flex; align-items: center; gap: 8px; }
+  .rc-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .rc-dot-mom  { background: #3b82f6; }
+  .rc-dot-evac { background: #8b5cf6; }
+  .rc-type-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; }
+  .rc-title { font-size: 15px; font-weight: 700; color: #0f172a; }
+  .rc-actions { display: flex; gap: 8px; }
+  .btn-primary {
+    flex: 1; padding: 7px 0; background: #1a237e; color: #fff;
+    border: none; border-radius: 6px; font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: background 0.12s;
+  }
+  .btn-primary:hover { background: #283593; }
+  .btn-secondary {
+    padding: 7px 12px; background: #f8fafc; color: #475569;
+    border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px;
+    cursor: pointer; transition: background 0.12s;
+  }
+  .btn-secondary:hover { background: #e2e8f0; }
+
+  /* ── Viewer tab ── */
+  .viewer { flex: 1; display: flex; flex-direction: column; }
+  .viewer-toolbar {
+    padding: 10px 20px; background: #fff; border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .viewer-toolbar label { font-size: 12px; color: #64748b; }
+  .viewer-toolbar select {
+    flex: 1; max-width: 340px; background: #fff; color: #1e293b;
+    border: 1px solid #cbd5e1; border-radius: 5px; padding: 5px 10px; font-size: 12px;
+  }
+  .viewer-toolbar .btn-new-tab {
+    padding: 5px 14px; background: #1a237e; color: #fff;
+    border: none; border-radius: 5px; font-size: 12px; cursor: pointer;
+  }
+  .viewer-placeholder {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 16px; color: #64748b; text-align: center; padding: 40px;
+  }
+  .viewer-placeholder h2 { font-size: 17px; color: #94a3b8; font-weight: 600; }
+  .viewer-placeholder p  { font-size: 13px; max-width: 380px; line-height: 1.6; }
+  #report-iframe { flex: 1; border: none; min-height: calc(100vh - 150px); }
+</style>
+</head>
+<body>
+<div class="layout">
+
+{# ── Sidebar ──────────────────────────────────────────────────────────────── #}
+<div class="sidebar">
+  <div class="sidebar-brand">
+    <h2>Inventory Management Hub</h2>
+    <p>{{ timeline|length }} month(s) · {{ reports|length }} report(s)</p>
+  </div>
+
+  {# ── AGING group ── #}
+  <div class="nav-group">
+    <div class="nav-group-label" onclick="toggleGroup(this)">📉 Aging <span class="nav-chevron">▼</span></div>
+    <div class="nav-group-body">
+
+      <div class="nav-section">
+        <div class="nav-label" onclick="toggleNav(this)">Views <span class="nav-chevron">▼</span></div>
+        <div class="nav-section-body">
+          <button class="nav-item active" id="nav-overview" onclick="showTab('overview', this)">
+            <span class="icon">📊</span> Overview
+          </button>
+          <button class="nav-item" id="nav-viewer" onclick="showTab('viewer', this)">
+            <span class="icon">📄</span> Report Viewer
+          </button>
+        </div>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-label" onclick="toggleNav(this)">MoM Analysis <span class="nav-chevron">▼</span></div>
+        <div class="nav-section-body">
+          {% set mom_reports = reports | selectattr('type','equalto','mom') | list %}
+          {% for r in mom_reports %}
+          <button class="nav-item" onclick="openReport('{{ r.filename }}', this)">
+            <span class="icon">📅</span>
+            <span>{{ r.label }}</span>
+            {% if loop.last %}<span class="badge badge-new">LATEST</span>{% endif %}
+          </button>
+          {% else %}
+          <div style="padding:8px 10px;font-size:11px;color:#475569;">No MoM reports yet.</div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-label" onclick="toggleNav(this)">Evacuation <span class="nav-chevron">▼</span></div>
+        <div class="nav-section-body">
+          {% for r in reports if r.type == 'evacuation' %}
+          <button class="nav-item" onclick="openReport('{{ r.filename }}', this)">
+            <span class="icon">🚨</span>
+            <span>{{ r.label }}</span>
+            <span class="badge badge-evac">EVAC</span>
+          </button>
+          {% else %}
+          <div style="padding:8px 10px;font-size:11px;color:#475569;">No evacuation report yet.</div>
+          {% endfor %}
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <hr class="nav-divider">
+
+  {# ── OVERSTOCK group ── #}
+  <div class="nav-group">
+    <div class="nav-group-label" onclick="toggleGroup(this)">🏷️ Overstock <span class="nav-chevron">▼</span></div>
+    <div class="nav-group-body">
+      <div style="padding:10px 10px 6px;font-size:11px;color:#475569;">No Overstock reports yet.</div>
+    </div>
+  </div>
+
+  <hr class="nav-divider">
+
+  {# ── PERFORMANCE TRACKER group ── #}
+  {% if slides %}
+  <div class="nav-group">
+    <div class="nav-group-label" onclick="toggleGroup(this)">📈 Performance Tracker <span class="nav-chevron">▼</span></div>
+    <div class="nav-group-body">
+      <div class="nav-section">
+        <div class="nav-section-body">
+          {% for s in slides %}
+          <div style="padding:6px 10px;">
+            <div style="font-size:11px;color:#94a3b8;margin-bottom:6px;">{{ s.label }}</div>
+            <div style="display:flex;gap:6px;">
+              {% if s.html %}
+              <button class="nav-item" style="flex:1;padding:5px 8px;font-size:10px;" onclick="openReport('{{ slides_dir }}/{{ s.html }}')">
+                <span class="icon">🌐</span> HTML
+              </button>
+              {% endif %}
+              <a href="{{ slides_dir }}/{{ s.pptx }}" download style="flex:1;text-decoration:none;">
+                <button class="nav-item" style="width:100%;padding:5px 8px;font-size:10px;">
+                  <span class="icon">📥</span> PPTX
+                </button>
+              </a>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="sidebar-footer">Generated {{ generated_at }}</div>
+</div>
+
+{# ── Main ─────────────────────────────────────────────────────────────────── #}
+<div class="main">
+
+  {# Page header with latest KPIs #}
+  <div class="page-header">
+    <div>
+      <h1>Overstock &amp; Aging Hub</h1>
+      <p>Aged inventory tracking · Nov 2025 – present</p>
+    </div>
+    {% if latest %}
+    <div class="header-latest">
+      <div class="header-kpi">
+        <div class="val" id="hdr-val">
+          ${{ "%.2f"|format(latest.aged_value / 1e6) }}M
+        </div>
+        <div class="lbl">Aged Value (Over 365)</div>
+        <div class="delta" id="hdr-val-delta"></div>
+      </div>
+      <div class="header-kpi">
+        <div class="val" id="hdr-units">
+          {{ "{:,}".format(latest.aged_units) }}
+        </div>
+        <div class="lbl">Aged Units</div>
+        <div class="delta" id="hdr-units-delta"></div>
+      </div>
+      <div class="header-kpi">
+        <div class="val" id="hdr-pct">
+          {{ "%.1f"|format(latest.aged_pct) }}%
+        </div>
+        <div class="lbl">% of Total Inventory</div>
+        <div class="delta" id="hdr-pct-delta"></div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  {# Tab bar #}
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="showTab('overview', this)">📊 Overview</button>
+    <button class="tab-btn" onclick="showTab('viewer', this)">📄 Report Viewer</button>
+  </div>
+
+  {# ── Overview tab ── #}
+  <div class="tab-panel active" id="tab-overview">
+    <div class="overview">
+
+      {# Month history strip #}
+      {% if timeline %}
+      <div class="month-strip">
+        {% for pt in timeline %}
+        <div class="month-card {% if loop.last %}latest{% endif %}"
+             onclick="openReport(getMomReportForMonth('{{ pt.date_key }}'))">
+          <div class="mc-label">{{ pt.label }}</div>
+          <div class="mc-val">${{ "%.2f"|format(pt.aged_value / 1e6) }}M</div>
+          <div class="mc-sub">{{ "{:,}".format(pt.aged_units) }} units · {{ "%.1f"|format(pt.aged_pct) }}%</div>
+          {% if not loop.first %}
+          <div class="mc-delta" id="delta-{{ loop.index }}"></div>
+          {% else %}
+          <div class="mc-delta" style="color:#94a3b8;">— baseline</div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+
+      {# Trend chart #}
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Aged Inventory Trend — Over 365 Days</span>
+          <div class="chart-toggle">
+            <button class="toggle-btn on" id="toggle-val" onclick="toggleMetric('val')">$ Value</button>
+            <button class="toggle-btn on" id="toggle-units" onclick="toggleMetric('units')">Units</button>
+            <button class="toggle-btn on" id="toggle-pct" onclick="toggleMetric('pct')">% Total</button>
+          </div>
+        </div>
+        <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+      </div>
+      {% endif %}
+
+      {# Report cards #}
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Reports Library</span>
+        </div>
+        <div class="reports-grid">
+          {% for r in reports %}
+          <div class="report-card">
+            <div class="rc-type-row">
+              <div class="rc-dot {% if r.type == 'mom' %}rc-dot-mom{% else %}rc-dot-evac{% endif %}"></div>
+              <span class="rc-type-label">{% if r.type == 'mom' %}Month-over-Month Analysis{% else %}SKU Evacuation Analysis{% endif %}</span>
+            </div>
+            <div class="rc-title">{{ r.label }}</div>
+            <div class="rc-actions">
+              <button class="btn-primary" onclick="openReport('{{ r.filename }}')">Open in Viewer</button>
+              <button class="btn-secondary" onclick="window.open('{{ reports_dir }}/{{ r.filename }}','_blank')" title="Open in new tab">↗</button>
+            </div>
+          </div>
+          {% endfor %}
+
+          {% for s in slides %}
+          <div class="report-card" style="border-color:#c7d2fe;">
+            <div class="rc-type-row">
+              <div class="rc-dot" style="background:#f59e0b;"></div>
+              <span class="rc-type-label">Weekly Performance Tracker</span>
+            </div>
+            <div class="rc-title">{{ s.label }}</div>
+            <div class="rc-actions">
+              {% if s.html %}
+              <button class="btn-primary" onclick="openReport('{{ slides_dir }}/{{ s.html }}')">View HTML</button>
+              {% endif %}
+              <a href="{{ slides_dir }}/{{ s.pptx }}" download style="text-decoration:none;{% if not s.html %}flex:1;{% endif %}">
+                <button class="btn-secondary" style="width:100%;">Download PPTX 📥</button>
+              </a>
+              {% if not s.html %}
+              <button class="btn-secondary" onclick="window.open('{{ slides_dir }}/{{ s.pptx }}','_blank')">↗</button>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+    </div>
+  </div>{# end overview tab #}
+
+  {# ── Viewer tab ── #}
+  <div class="tab-panel" id="tab-viewer">
+    <div class="viewer">
+      <div class="viewer-toolbar">
+        <label>Report:</label>
+        <select id="reportSelect" onchange="loadFromDropdown()">
+          <option value="">— select a report —</option>
+          {% for r in reports %}
+          <option value="{{ r.filename }}">{{ r.label }}</option>
+          {% endfor %}
+        </select>
+        <button class="btn-new-tab" onclick="openExternal()">Open in New Tab ↗</button>
+      </div>
+      <div id="viewerBody" style="flex:1;display:flex;flex-direction:column;">
+        <div class="viewer-placeholder" id="viewerPlaceholder">
+          <h2>No report selected</h2>
+          <p>Choose a report from the sidebar or the dropdown above.<br>
+             MoM reports cover the 34-section month-over-month analysis.<br>
+             Evacuation reports show SKU-level clearance timelines.</p>
+        </div>
+        <iframe id="report-iframe" style="display:none;flex:1;border:none;min-height:calc(100vh - 150px);"></iframe>
+      </div>
+    </div>
+  </div>{# end viewer tab #}
+
+</div>{# end main #}
+</div>{# end layout #}
+
+<script>
+// ── Data from Python ─────────────────────────────────────────────────────────
+const REPORTS_DIR   = {{ reports_dir | tojson }};
+const TIMELINE      = {{ timeline | tojson }};
+const REPORTS_META  = {{ reports | tojson }};
+
+// ── Month card delta labels ──────────────────────────────────────────────────
+TIMELINE.forEach((pt, i) => {
+  if (i === 0) return;
+  const prev = TIMELINE[i - 1];
+  const valDelta = pt.aged_value - prev.aged_value;
+  const el = document.getElementById('delta-' + (i + 1));
+  if (!el) return;
+  const sign  = valDelta >= 0 ? '+' : '';
+  const cls   = valDelta > 0 ? 'delta-up' : (valDelta < 0 ? 'delta-down' : 'delta-flat');
+  const arrow = valDelta > 0 ? '↑' : (valDelta < 0 ? '↓' : '→');
+  const fmtM  = v => '$' + (Math.abs(v) / 1e6).toFixed(2) + 'M';
+  el.innerHTML = `<span class="${cls}">${arrow} ${sign}${fmtM(valDelta)} vs ${prev.label}</span>`;
+});
+
+// Header deltas (latest vs prev)
+if (TIMELINE.length >= 2) {
+  const cur  = TIMELINE[TIMELINE.length - 1];
+  const prev = TIMELINE[TIMELINE.length - 2];
+  const setDelta = (id, val, fmt) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const sign = val >= 0 ? '+' : '';
+    const cls  = val > 0 ? 'delta-up' : (val < 0 ? 'delta-down' : 'delta-flat');
+    const arrow = val > 0 ? '↑' : (val < 0 ? '↓' : '→');
+    el.innerHTML = `<span class="${cls}">${arrow} ${sign}${fmt(val)} vs ${prev.label}</span>`;
+  };
+  setDelta('hdr-val-delta',   cur.aged_value - prev.aged_value, v => '$' + (Math.abs(v)/1e6).toFixed(2) + 'M');
+  setDelta('hdr-units-delta', cur.aged_units - prev.aged_units, v => Math.abs(v).toLocaleString() + ' units');
+  setDelta('hdr-pct-delta',   cur.aged_pct   - prev.aged_pct,  v => (v >= 0 ? '+' : '') + v.toFixed(1) + 'pp');
+}
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function showTab(name, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  // Tab buttons are separate from nav items; update the one that was clicked
+  if (btn) btn.classList.add('active');
+  // Also sync sidebar nav buttons
+  document.getElementById('nav-overview') && document.getElementById('nav-overview').classList.toggle('active', name === 'overview');
+  document.getElementById('nav-viewer')   && document.getElementById('nav-viewer').classList.toggle('active', name === 'viewer');
+}
+
+// ── Report loading ────────────────────────────────────────────────────────────
+let currentFile = null;
+
+function openReport(filename, navEl) {
+  if (!filename) return;
+  currentFile = filename;
+
+  // Highlight nav item
+  document.querySelectorAll('.nav-item').forEach(n => {
+    if (!n.id) n.classList.remove('active');
+  });
+  if (navEl) navEl.classList.add('active');
+
+  // Switch to viewer tab
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-viewer').classList.add('active');
+  document.querySelectorAll('.tab-btn')[1].classList.add('active');
+  document.getElementById('nav-viewer').classList.add('active');
+  document.getElementById('nav-overview').classList.remove('active');
+
+  // Load iframe
+  const iframe = document.getElementById('report-iframe');
+  const placeholder = document.getElementById('viewerPlaceholder');
+  // If path already contains a directory (starts with .. or /), use as-is
+  iframe.src = (filename.startsWith('..') || filename.startsWith('/'))
+    ? filename
+    : REPORTS_DIR + '/' + filename;
+  iframe.style.display = 'block';
+  placeholder.style.display = 'none';
+
+  // Sync dropdown
+  document.getElementById('reportSelect').value = filename;
+}
+
+function loadFromDropdown() {
+  const val = document.getElementById('reportSelect').value;
+  if (val) openReport(val, null);
+}
+
+function openExternal() {
+  if (currentFile) {
+    const url = (currentFile.startsWith('..') || currentFile.startsWith('/'))
+      ? currentFile : REPORTS_DIR + '/' + currentFile;
+    window.open(url, '_blank');
+  }
+}
+
+// Map date_key to MoM report filename
+function getMomReportForMonth(dateKey) {
+  const match = REPORTS_META.find(r => r.type === 'mom' && r.date_key === dateKey);
+  return match ? match.filename : null;
+}
+
+// ── Trend chart ────────────────────────────────────────────────────────────
+{% if timeline %}
+const tl = TIMELINE;
+const labels    = tl.map(t => t.label);
+const valData   = tl.map(t => +(t.aged_value / 1e6).toFixed(3));
+const unitData  = tl.map(t => t.aged_units);
+const pctData   = tl.map(t => +t.aged_pct.toFixed(2));
+
+const trendChart = new Chart(document.getElementById('trendChart'), {
+  type: 'line',
+  data: {
+    labels,
+    datasets: [
+      {
+        id: 'val',
+        label: 'Aged Value ($M)',
+        data: valData,
+        borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.08)',
+        fill: true, tension: 0.35, pointRadius: 6, pointHoverRadius: 8,
+        yAxisID: 'yVal',
+      },
+      {
+        id: 'units',
+        label: 'Aged Units',
+        data: unitData,
+        borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.08)',
+        fill: true, tension: 0.35, pointRadius: 6, pointHoverRadius: 8,
+        yAxisID: 'yUnits',
+      },
+      {
+        id: 'pct',
+        label: '% of Total',
+        data: pctData,
+        borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,0.08)',
+        fill: true, tension: 0.35, pointRadius: 6, pointHoverRadius: 8,
+        yAxisID: 'yPct',
+      },
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: {
+        display: true,
+        labels: { color: '#64748b', font: { size: 11 }, boxWidth: 12 }
+      },
+      tooltip: {
+        callbacks: {
+          label: ctx => {
+            if (ctx.dataset.yAxisID === 'yVal')   return ' Aged Value: $' + ctx.parsed.y.toFixed(2) + 'M';
+            if (ctx.dataset.yAxisID === 'yUnits')  return ' Aged Units: ' + ctx.parsed.y.toLocaleString();
+            if (ctx.dataset.yAxisID === 'yPct')    return ' % of Total: ' + ctx.parsed.y.toFixed(1) + '%';
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        ticks: { color: '#64748b', font: { size: 11 } },
+        grid:  { color: '#f1f5f9' }
+      },
+      yVal: {
+        type: 'linear', position: 'left', display: true,
+        ticks: { color: '#3b82f6', callback: v => '$' + v.toFixed(1) + 'M' },
+        grid:  { color: '#f1f5f9' }
+      },
+      yUnits: {
+        type: 'linear', position: 'right', display: true,
+        ticks: { color: '#f59e0b', callback: v => v >= 1000 ? (v/1000).toFixed(0)+'K' : v },
+        grid:  { drawOnChartArea: false }
+      },
+      yPct: {
+        type: 'linear', position: 'right', display: false,
+        ticks: { color: '#8b5cf6', callback: v => v + '%' },
+        grid:  { drawOnChartArea: false }
+      },
+    }
+  }
+});
+
+// Toggle metric visibility
+const METRIC_AXIS = { val: 'yVal', units: 'yUnits', pct: 'yPct' };
+function toggleMetric(metric) {
+  const btn = document.getElementById('toggle-' + metric);
+  const ds = trendChart.data.datasets.find(d => d.id === metric);
+  if (!ds) return;
+  const hidden = !ds.hidden;
+  ds.hidden = hidden;
+  trendChart.options.scales[METRIC_AXIS[metric]].display = !hidden;
+  btn.classList.toggle('on', !hidden);
+  trendChart.update();
+}
+{% endif %}
+
+function toggleNav(labelEl) {
+  const body = labelEl.nextElementSibling;
+  const collapsed = body.classList.toggle('collapsed');
+  labelEl.classList.toggle('collapsed', collapsed);
+}
+
+function toggleGroup(labelEl) {
+  const body = labelEl.nextElementSibling;
+  const collapsed = body.classList.toggle('collapsed');
+  labelEl.classList.toggle('collapsed', collapsed);
+}
+</script>
+</body>
+</html>

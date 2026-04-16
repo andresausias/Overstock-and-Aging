@@ -1,0 +1,14 @@
+{
+  "name": "overstock-aging-slides",
+  "version": "1.0.0",
+  "description": "Weekly performance tracking PPTX generator",
+  "main": "generate_slides.js",
+  "scripts": {
+    "slides": "node generate_slides.js"
+  },
+  "dependencies": {
+    "pptxgenjs": "^4.0.1",
+    "xlsx": "^0.18.5",
+    "dotenv": "^16.4.5"
+  }
+}

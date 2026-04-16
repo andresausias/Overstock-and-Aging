@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aging Inventory Analysis — {{ prev_label }} vs {{ curr_label }} {{ year }}</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #f5f5f5; font-family: 'Segoe UI', Arial, sans-serif; color: #333; }
+  .page-header {
+    background: linear-gradient(135deg, #1a237e, #283593);
+    color: #fff; padding: 28px 32px;
+  }
+  .page-header h1 { font-size: 26px; font-weight: 700; }
+  .page-header p { font-size: 13px; color: rgba(255,255,255,0.75); margin-top: 4px; }
+  .container { max-width: 1440px; margin: 0 auto; padding: 20px; }
+  .section {
+    background: #fff; border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    margin-bottom: 24px; padding: 20px;
+  }
+  .section-title {
+    font-size: 16px; font-weight: 700; color: #1a237e;
+    border-bottom: 2px solid #e8eaf6; padding-bottom: 10px; margin-bottom: 16px;
+  }
+  .section-banner-blue {
+    background: linear-gradient(135deg, #1a237e, #283593);
+    color: #fff; border-radius: 6px; padding: 8px 16px;
+    font-size: 14px; font-weight: 600; margin-bottom: 16px;
+  }
+  .section-banner-green {
+    background: linear-gradient(135deg, #1b5e20, #2e7d32);
+    color: #fff; border-radius: 6px; padding: 8px 16px;
+    font-size: 14px; font-weight: 600; margin-bottom: 16px;
+  }
+  .chart-wrap { position: relative; height: 420px; margin: 12px 0; }
+  .chart-wrap-sm { position: relative; height: 320px; margin: 12px 0; }
+  .chart-wrap-lg { position: relative; height: 550px; margin: 12px 0; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 16px; }
+  .kpi-card {
+    background: #f8f9fa; border-radius: 8px; padding: 16px;
+    border-left: 4px solid #1a237e; text-align: center;
+  }
+  .kpi-card .kpi-val { font-size: 22px; font-weight: 700; color: #1a237e; }
+  .kpi-card .kpi-lbl { font-size: 11px; color: #666; margin-top: 4px; }
+  .kpi-card .kpi-change { font-size: 12px; margin-top: 4px; }
+  .pos { color: #f44336; }
+  .neg { color: #4caf50; }
+  .insight {
+    background: #f0f7ff; border-left: 4px solid #2196F3;
+    border-radius: 0 6px 6px 0; padding: 12px 16px; margin-top: 16px;
+    font-size: 13px; line-height: 1.6;
+  }
+  .insight strong { color: #1565c0; }
+
+  /* Tables */
+  table.st { width: 100%; border-collapse: collapse; font-size: 12px; }
+  table.st thead tr {
+    background: linear-gradient(135deg, #4a5568, #2d3748);
+    color: #fff;
+  }
+  table.st th { padding: 10px 12px; text-align: left; font-weight: 600; }
+  table.st td { padding: 8px 12px; border-bottom: 1px solid #f0f0f0; }
+  table.st tbody tr:nth-child(even) { background: #f9f9f9; }
+  table.st tbody tr:hover { background: #e8f4fd; }
+  table.st .row-inc { background: #fff0f0; }
+  table.st .row-inc:nth-child(even) { background: #ffe4e4; }
+  table.st .row-dec { background: #f0fff4; }
+  table.st .row-dec:nth-child(even) { background: #dcfce7; }
+  span.sb {
+    background: #9c27b0; color: #fff;
+    border-radius: 12px; padding: 2px 8px; font-size: 10px;
+  }
+  span.nb {
+    background: #9e9e9e; color: #fff;
+    border-radius: 12px; padding: 2px 8px; font-size: 10px;
+  }
+
+  /* Heatmap */
+  .heatmap-cell { text-align: right; padding: 6px 10px; font-size: 11px; }
+
+  .generated { text-align: right; font-size: 11px; color: #999; padding: 8px 0 16px; }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>Aging Inventory Analysis — {{ prev_label }} vs {{ curr_label }} {{ year }}</h1>
+  <p>Generated {{ generated_at }} | Filters applied: Packaging SKUs, Amazon, SPADR- SKUs, Eurofina</p>
+</div>
+
+<div class="container">
+<p class="generated">Generated {{ generated_at }}</p>
+
+{# ══════════════════════════════════════════════════════════════════ #}
+{# S1 — Key Metrics Summary #}
+{# ══════════════════════════════════════════════════════════════════ #}
+<div class="section">
+  <div class="section-title">S1 — Key Metrics Summary</div>
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-val">{{ fmt_val(d.curr_aged_value) }}</div>
+      <div class="kpi-lbl">Current Aged Value (Over 365)</div>
+      <div class="kpi-change {% if d.mom_value_change > 0 %}pos{% else %}neg{% endif %}">
+        {% if d.mom_value_change > 0 %}▲{% else %}▼{% endif %}
+        {{ fmt_val(d.mom_value_change|abs) }}
+        ({{ "%.1f"|format(d.mom_pct_change|abs) }}%)
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-val">{{ fmt_units(d.curr_aged_units) }}</div>
+      <div class="kpi-lbl">Current Aged Units (Over 365)</div>
+      <div class="kpi-change">
+        Prior: {{ fmt_units(d.prev_aged_units) }}
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-val">{{ fmt_val(d.curr_us) }}</div>
+      <div class="kpi-lbl">US Aged Value</div>
+      <div class="kpi-change">Prior: {{ fmt_val(d.prev_us) }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-val">{{ fmt_val(d.curr_int) }}</div>
+      <div class="kpi-lbl">International Aged Value</div>
+      <div class="kpi-change">Prior: {{ fmt_val(d.prev_int) }}</div>
+    </div>
+  </div>
+
+  <table class="st">
+    <thead><tr>
+      <th>Category</th>
+      <th>{{ prev_label }} Value</th>
+      <th>{{ curr_label }} Value</th>
+      <th>MoM Change ($)</th>
+      <th>MoM Change (%)</th>
+    </tr></thead>
+    <tbody>
+    {% for cat in categories %}
+    {% set cv = d.curr_by_cat[cat] %}
+    {% set pv = d.prev_by_cat[cat] %}
+    {% set chg = cv - pv %}
+    {% set pct = (chg / pv * 100) if pv != 0 else 0 %}
+    <tr>
+      <td><strong>{{ cat }}</strong></td>
+      <td>{{ fmt_val(pv) }}</td>
+      <td>{{ fmt_val(cv) }}</td>
+      <td class="{% if chg > 0 %}pos{% else %}neg{% endif %}">
+        {{ "+" if chg > 0 else "" }}{{ fmt_val(chg) }}
+      </td>
+      <td class="{% if chg > 0 %}pos{% else %}neg{% endif %}">
+        {{ "+" if pct > 0 else "" }}{{ "%.1f"|format(pct) }}%
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <div class="insight">
+    <strong>Key Insight:</strong> Total aged value moved from
+    {{ fmt_val(d.prev_aged_value) }} to {{ fmt_val(d.curr_aged_value) }}
+    ({{ "+" if d.mom_value_change > 0 else "" }}{{ fmt_val(d.mom_value_change) }},
+    {{ "%.1f"|format(d.mom_pct_change) }}% MoM).
+    Review category breakdown for primary drivers.
+  </div>
+</div>
+
+{# ══════════════════════════════════════════════════════════════════ #}
+{# S2 — Aging Distribution (all buckets) #}
+{# ══════════════════════════════════════════════════════════════════ #}
+<div class="section">
+  <div class="section-title">S2 — Inventory Aging Distribution (All Buckets)</div>
+  <div class="chart-wrap">
+    <canvas id="s2chart"></canvas>
+  </div>
+  <div class="insight">
+    <strong>Key Insight:</strong> Distribution across aging buckets comparing
+    {{ prev_label }} vs {{ curr_label }}. Focus on "Over 365" which represents
+    {{ fmt_val(d.curr_aged_value) }} of at-risk inventory.
+  </div>
+</div>
+
+{# S3 — Aged by Region #}
+<div class="section">
+  <div class="section-title">S3 — Aged Inventory by Region (Over 365)</div>
+  <div class="chart-wrap-sm">
+    <canvas id="s3chart"></canvas>
+  </div>
+  <div class="insight">
+    <strong>Key Insight:</strong>
+    US aged: {{ fmt_val(d.curr_us) }} (prev: {{ fmt_val(d.prev_us) }}).
+    International aged: {{ fmt_val(d.curr_int) }} (prev: {{ fmt_val(d.prev_int) }}).
+  </div>
+</div>
+
+{# S4 — Aged by Category (Doughnut) #}
+<div class="section">
+  <div class="section-title">S4 — Aged by Category (Current Month)</div>
+  <div class="chart-wrap-sm">
+    <canvas id="s4chart"></canvas>
+  </div>
+  <div class="insight">
+    <strong>Key Insight:</strong> Category share of total aged
+    {{ fmt_val(d.curr_aged_value) }}.
+    Dominant category drives evacuation priority.
+  </div>
+</div>
+
+{# S5 — D2C Group Breakdown (Doughnut) #}
+<div class="section">
+  <div class="section-title">S5 — D2C Group Breakdown</div>
+  <div class="chart-wrap-sm">
+    <canvas id="s5chart"></canvas>
+  </div>
+  <div class="insight">
+    <strong>Key Insight:</strong>
+    D2C Group (D2C + EMP + BAD LOT) total aged:
+    {{ fmt_val(d.curr_by_cat['D2C'] + d.curr_by_cat['EMP'] + d.curr_by_cat['BAD LOT']) }}.
+  </div>
+</div>
+
+{# S6 — Top 15 Styles All #}
+<div class="section">
+  <div class="section-title">S6 — Top 15 Aged Styles (All Categories)</div>
+  <div class="chart-wrap-lg">
+    <canvas id="s6chart"></canvas>
+  </div>
+  <div class="insight">
+    <strong>Key Insight:</strong>
+    Top 15 styles represent the most concentrated aged risk. Purple bars = silicone band styles.
+    Red = > $80K, Orange = $40K–$80K, Blue = < $40K.
+  </div>
+</div>
+
+{# S7 — WHOLESALE Top 15 #}
+<div class="section">
+  <div class="section-title">S7 — WHOLESALE Top 15 Aged Styles</div>
+  <div class="chart-wrap-lg">
+    <canvas id="s7chart"></canvas>
+  </div>
+  <div class="insight">
+    <strong>Key Insight:</strong>
+    WHOLESALE aged total: {{ fmt_val(d.curr_by_cat['WHOLESALE']) }}.
+    These styles require wholesale-channel evacuation focus.
+  </div>
+</div>
+
+{# S8 — Style Movement All #}
+<div class="section">
+  <div class="section-banner-blue">S8 — Style Movement (All Categories) — Change Analysis</div>
+  <div class="grid-2">
+    <div>
+      <p style="font-size:12px;font-weight:600;margin-bottom:8px;">Top 10 Increases</p>
+      <div class="chart-wrap"><canvas id="s8inc"></canvas></div>
+    </div>
+    <div>
+      <p style="font-size:12px;font-weight:600;margin-bottom:8px;">Top 10 Decreases</p>
+      <div class="chart-wrap"><canvas id="s8dec"></canvas></div>
+    </div>
+  </div>
+  <div class="insight">
+    <strong>Key Insight:</strong>
+    Styles with the largest MoM increases require immediate evacuation attention.
+    Decreases indicate successful clearance or sales velocity improvement.
+  </div>
+</div>
+
+{# S9 — Style Movement D2C Group #}
+<div class="section">
+  <div class="section-banner-blue">S9 — Style Movement (D2C Group) — Change Analysis</div>
+  <div class="grid-2">
+    <div>
+      <p style="font-size:12px;font-weight:600;margin-bottom:8px;">Top 10 Increases</p>
+      <div class="chart-wrap"><canvas id="s9inc"></canvas></div>
+    </div>
+    <div>
+      <p style="font-size:12px;font-weight:600;margin-bottom:8px;">Top 10 Decreases</p>
+      <div class="chart-wrap"><canvas id="s9dec"></canvas></div>
+    </div>
+  </div>
+  <div class="insight">
+    <strong>Key Insight:</strong>
+    D2C Group (D2C + EMP + BAD LOT) channel movement.
+    Significant increases flag styles that aged faster than sold.
+  </div>
+</div>
+
+{# S10 — Style Movement Wholesale #}
+<div class="section">
+  <div class="section-banner-blue">S10 — Style Movement (WHOLESALE) — Change Analysis</div>
+  <div class="grid-2">
+    <div>
+      <p style="font-size:12px;font-weight:600;margin-bottom:8px;">Top 10 Increases</p>
+      <div class="chart-wrap"><canvas id="s10inc"></canvas></div>
+    </div>
+    <div>
+      <p style="font-size:12px;font-weight:600;margin-bottom:8px;">Top 10 Decreases</p>
+      <div class="chart-wrap"><canvas id="s10dec"></canvas></div>
+    </div>
+  </div>
+  <div class="insight">
+    <strong>Key Insight:</strong>
+    WHOLESALE channel movement. Focus on styles where aging is increasing
+    without corresponding wholesale order activity.
+  </div>
+</div>
+
+{# S11 — Category Aging Changes #}
+<div class="section">
+  <div class="section-banner-blue">S11 — Category Aging Changes (MoM) — Change Analysis</div>
+  <div class="chart-wrap-sm"><canvas id="s11chart"></canvas></div>
+  <div class="insight">
+    <strong>Key Insight:</strong>
+    Bar shows net dollar change per category.
+    Positive = deterioration, negative = improvement.
+  </div>
+</div>
+
+{# S12 — D2C Group Top 15 #}
+<div class="section">
+  <div class="section-title">S12 — D2C Group Top 15 Aged Styles</div>
+  <div class="chart-wrap-lg"><canvas id="s12chart"></canvas></div>
+  <div class="insight">
+    <strong>Key Insight:</strong>
+    D2C Group aged total:
+    {{ fmt_val(d.curr_by_cat['D2C'] + d.curr_by_cat['EMP'] + d.curr_by_cat['BAD LOT']) }}.
+    These are the highest-priority D2C evacuation targets.
+  </div>
+</div>
+
+{# S13 — Top 25 Style Increases (table) #}
+<div class="section">
+  <div class="section-banner-blue">S13 — Top 25 Style Increases — Change Analysis</div>
+  <div style="overflow-x:auto;">
+  <table class="st">
+    <thead><tr>
+      <th>#</th><th>Style</th><th>Type</th>
+      <th>{{ prev_label }} Value</th><th>{{ curr_label }} Value</th>
+      <th>Change ($)</th><th>Change (%)</th>
+    </tr></thead>
+    <tbody>
+    {% for _, row in d.top25_increases.iterrows() %}
+    <tr class="row-inc">
+      <td>{{ loop.index }}</td>
+      <td><strong>{{ row['Style'] }}</strong>
+        {% if is_silicone(row['Style']) %}&nbsp;<span class="sb">S</span>{% else %}<span class="nb">NO</span>{% endif %}
+      </td>
+      <td>{% if is_silicone(row['Style']) %}Silicone Band{% else %}Standard{% endif %}</td>
+      <td>{{ fmt_val(row['value_prev']) }}</td>
+      <td>{{ fmt_val(row['value_curr']) }}</td>
+      <td class="pos">+{{ fmt_val(row['change']) }}</td>
+      <td class="pos">+{{ "%.1f"|format(row['change_pct']) }}%</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <div class="insight">
+    <strong>Key Insight:</strong>
+    These 25 styles have the highest MoM dollar deterioration. Prioritize for evacuation review.
+  </div>
+</div>
+
+{# S14 — Top 25 Style Decreases (table) #}
+<div class="section">
+  <div class="section-banner-blue">S14 — Top 25 Style Decreases — Change Analysis</div>
+  <div style="overflow-x:auto;">
+  <table class="st">
+    <thead><tr>
+      <th>#</th><th>Style</th><th>Type</th>
+      <th>{{ prev_label }} Value</th><th>{{ curr_label }} Value</th>
+      <th>Change ($)</th><th>Change (%)</th>
+    </tr></thead>
+    <tbody>
+    {% for _, row in d.top25_decreases.iterrows() %}
+    <tr class="row-dec">
+      <td>{{ loop.index }}</td>
+      <td><strong>{{ row['Style'] }}</strong>
+        {% if is_silicone(row['Style']) %}&nbsp;<span class="sb">S</span>{% else %}<span class="nb">NO</span>{% endif %}
+      </td>
+      <td>{% if is_silicone(row['Style']) %}Silicone Band{% else %}Standard{% endif %}</td>
+      <td>{{ fmt_val(row['value_prev']) }}</td>
+      <td>{{ fmt_val(row['value_curr']) }}</td>
+      <td class="neg">{{ fmt_val(row['change']) }}</td>
+      <td class="neg">{{ "%.1f"|format(row['change_pct']) }}%</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <div class="insight">
+    <strong>Key Insight:</strong>
+    These 25 styles show the greatest improvement — evacuation tactics are working here.
+  </div>
+</div>
+
+{# S15 — Location Heatmap #}
+<div class="section">
+  <div class="section-title">S15 — Location Heatmap (All Buckets)</div>
+  <div style="overflow-x:auto;">
+  <table class="st">
+    <thead><tr>
+      <th>Location</th><th>Market</th>
+      {% for b in buckets %}<th>{{ b }}</th>{% endfor %}
+      <th>Aged Total</th>
+    </tr></thead>
+    <tbody>
+    {% for loc in locations %}
+    {% set row = d.location_heatmap[loc] %}
+    <tr>
+      <td><strong>{{ loc }}</strong></td>
+      <td>{{ location_market[loc] }}</td>
+      {% for b in buckets %}
+      <td class="heatmap-cell">{{ fmt_val(row[b]) }}</td>
+      {% endfor %}
+      <td><strong>{{ fmt_val(row['aged_total']) }}</strong></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <div class="insight">
+    <strong>Key Insight:</strong>
+    Location heatmap shows aged inventory concentration. Locations with high "Over 365" values
+    need warehouse-specific evacuation plans.
+  </div>
+</div>
+
+{# S16 — Location Comparison (3 charts) #}
+<div class="section">
+  <div class="section-banner-blue">S16 — Location Comparison — Change Analysis</div>
+  <div class="grid-3">
+    <div>
+      <p style="font-size:12px;font-weight:600;margin-bottom:8px;">Absolute Change ($)</p>
+      <div class="chart-wrap"><canvas id="s16abs"></canvas></div>
+    </div>
+    <div>
+      <p style="font-size:12px;font-weight:600;margin-bottom:8px;">% Change</p>
+      <div class="chart-wrap"><canvas id="s16pct"></canvas></div>
+    </div>
+    <div>
+      <p style="font-size:12px;font-weight:600;margin-bottom:8px;">Side-by-Side ({{ prev_label }} vs {{ curr_label }})</p>
+      <div class="chart-wrap"><canvas id="s16side"></canvas></div>
+    </div>
+  </div>
+  <div class="insight">
+    <strong>Key Insight:</strong>
+    Location ordering follows deterioration magnitude (worst first).
+    Locations shown left-to-right by largest net increase in aged value.
+  </div>
+</div>
+
+{# S17–S25: Per-location increases #}
+{% for loc in d.loc_order %}
+{% set sidx = loop.index + 16 %}
+<div class="section">
+  <div class="section-banner-blue">S{{ sidx }} — {{ loc }} ({{ location_market[loc] }}) — Top 15 Style Increases — Change Analysis</div>
+  <div class="chart-wrap-lg"><canvas id="s{{ sidx }}chart"></canvas></div>
+  <div class="insight">
+    <strong>Key Insight:</strong>
+    {{ loc }} location aged change: {{ "+" if d.loc_change[loc] > 0 else "" }}{{ fmt_val(d.loc_change[loc]) }}
+    ({{ "+" if d.loc_change_pct[loc] > 0 else "" }}{{ "%.1f"|format(d.loc_change_pct[loc]) }}% MoM).
+    Top increasing styles drive this warehouse's deterioration.
+  </div>
+</div>
+{% endfor %}
+
+{# S26–S34: Per-location absolute values #}
+{% for loc in d.loc_order %}
+{% set sidx = loop.index + 25 %}
+<div class="section">
+  <div class="section-banner-green">S{{ sidx }} — {{ loc }} — Top 15 Aged Styles by Absolute Value — Absolute Value</div>
+  <div class="chart-wrap-lg"><canvas id="s{{ sidx }}chart"></canvas></div>
+  <div class="insight">
+    <strong>Key Insight:</strong>
+    Total aged at {{ loc }}: {{ fmt_val(d.curr_by_loc[loc]) }}.
+    These are the highest-value aged styles requiring immediate action at this location.
+  </div>
+</div>
+{% endfor %}
+
+</div>{# end container #}
+
+<script>
+// ── Chart.js custom data label plugin ───────────────────────────────────────
+const DL = {
+  id: 'DL',
+  afterDatasetsDraw(chart, _, opts) {
+    if (chart.config.type === 'doughnut' || chart.config.type === 'pie') return;
+    const {ctx} = chart;
+    chart.data.datasets.forEach((ds, di) => {
+      const meta = chart.getDatasetMeta(di);
+      if (meta.hidden) return;
+      meta.data.forEach((el, i) => {
+        const val = ds.data[i];
+        const fmt = opts.fmt || 'K';
+        let label = '';
+        if (fmt === 'M') label = '$' + (Math.abs(val)/1e6).toFixed(2) + 'M';
+        else if (fmt === 'K') label = '$' + (Math.abs(val)/1e3).toFixed(1) + 'K';
+        else if (fmt === '+K') label = (val >= 0 ? '+$' : '-$') + (Math.abs(val)/1e3).toFixed(1) + 'K';
+        else if (fmt === '%') label = (val >= 0 ? '+' : '') + val.toFixed(1) + '%';
+        const isHoriz = chart.config.type === 'bar' &&
+          chart.options.indexAxis === 'y';
+        ctx.save();
+        ctx.fillStyle = '#333';
+        ctx.font = '10px Arial';
+        ctx.textBaseline = 'middle';
+        if (isHoriz) {
+          const x = el.x + 4;
+          const y = el.y;
+          ctx.textAlign = 'left';
+          ctx.fillText(label, x, y);
+        } else {
+          const x = el.x;
+          const y = val >= 0 ? el.y - 8 : el.y + 14;
+          ctx.textAlign = 'center';
+          ctx.fillText(label, x, y);
+        }
+        ctx.restore();
+      });
+    });
+  }
+};
+Chart.register(DL);
+
+const mkH = (id, labels, values, colors, fmtMode='K') => new Chart(document.getElementById(id), {
+  type:'bar',
+  data:{labels, datasets:[{data:values, backgroundColor:colors, borderColor:colors.map(c=>c.replace('0.6','1')), borderWidth:1}]},
+  options:{
+    indexAxis:'y', responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{display:false}, DL:{fmt:fmtMode}},
+    scales:{x:{ticks:{callback:v=>'$'+(Math.abs(v)/1e3).toFixed(0)+'K'}}}
+  }
+});
+
+const mkV = (id, labels, values, colors, fmtMode='+K') => new Chart(document.getElementById(id), {
+  type:'bar',
+  data:{labels, datasets:[{data:values, backgroundColor:colors, borderColor:colors.map(c=>c.replace('0.6','1')), borderWidth:1}]},
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{display:false}, DL:{fmt:fmtMode}},
+    scales:{y:{ticks:{callback:v=>(v>=0?'+$':'-$')+(Math.abs(v)/1e3).toFixed(0)+'K'}}}
+  }
+});
+
+const mkD = (id, labels, data, colors) => new Chart(document.getElementById(id), {
+  type:'doughnut',
+  data:{labels, datasets:[{data, backgroundColor:colors}]},
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{position:'right'},tooltip:{callbacks:{label:ctx=>{
+      const total=ctx.dataset.data.reduce((a,b)=>a+b,0);
+      return ctx.label+': $'+(ctx.raw/1e6).toFixed(2)+'M ('+(ctx.raw/total*100).toFixed(1)+'%)';
+    }}}}
+  }
+});
+
+// ── Data from Python ─────────────────────────────────────────────────────────
+const BUCKETS = {{ buckets | tojson }};
+const LOCATIONS = {{ locations | tojson }};
+const CATS = {{ categories | tojson }};
+
+const currBuckets = {{ d.curr_buckets.values() | list | tojson }};
+const prevBuckets = {{ d.prev_buckets.values() | list | tojson }};
+const currByCat = {{ d.curr_by_cat.values() | list | tojson }};
+const prevByCat = {{ d.prev_by_cat.values() | list | tojson }};
+
+// S2 — Aging Distribution
+new Chart(document.getElementById('s2chart'), {
+  type:'bar',
+  data:{
+    labels: BUCKETS,
+    datasets:[
+      {label:'{{ prev_label }}', data:prevBuckets, backgroundColor:'rgba(76,175,80,0.6)', borderColor:'rgba(76,175,80,1)', borderWidth:1},
+      {label:'{{ curr_label }}', data:currBuckets, backgroundColor:'rgba(244,67,54,0.6)', borderColor:'rgba(244,67,54,1)', borderWidth:1}
+    ]
+  },
+  options:{responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{position:'top'}, DL:{fmt:'M'}},
+    scales:{y:{ticks:{callback:v=>'$'+(v/1e6).toFixed(1)+'M'}}}}
+});
+
+// S3 — Region
+new Chart(document.getElementById('s3chart'), {
+  type:'bar',
+  data:{
+    labels:['US','International'],
+    datasets:[
+      {label:'{{ prev_label }}', data:[{{ d.prev_us }}, {{ d.prev_int }}], backgroundColor:'rgba(76,175,80,0.6)'},
+      {label:'{{ curr_label }}', data:[{{ d.curr_us }}, {{ d.curr_int }}], backgroundColor:'rgba(244,67,54,0.6)'}
+    ]
+  },
+  options:{responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{position:'top'}, DL:{fmt:'M'}},
+    scales:{y:{ticks:{callback:v=>'$'+(v/1e6).toFixed(1)+'M'}}}}
+});
+
+// S4 — Category Doughnut
+mkD('s4chart', CATS, currByCat,
+  ['rgba(33,150,243,0.8)','rgba(255,152,0,0.8)','rgba(76,175,80,0.8)','rgba(156,39,176,0.8)']);
+
+// S5 — D2C Group Doughnut
+mkD('s5chart',
+  ['D2C','EMP','BAD LOT'],
+  [{{ d.curr_by_cat['D2C'] }}, {{ d.curr_by_cat['EMP'] }}, {{ d.curr_by_cat['BAD LOT'] }}],
+  ['rgba(33,150,243,0.8)','rgba(76,175,80,0.8)','rgba(156,39,176,0.8)']);
+
+// S6 — Top 15 All
+{% set top15_labels = d.top15_all['Style'].tolist() %}
+{% set top15_values = d.top15_all['value'].tolist() %}
+{% set top15_colors = [] %}
+{% for i in range(top15_labels|length) %}
+  {% set _ = top15_colors.append(bar_color_absolute(top15_labels[i], top15_values[i])) %}
+{% endfor %}
+mkH('s6chart',
+  {{ top15_labels | tojson }}.map((s,i)=> ({{ (d.top15_all['Style'].isin(SILICONE_STYLES)|list) | tojson }}[i] ? s+' (S)' : s)),
+  {{ top15_values | tojson }},
+  {{ top15_colors | tojson }}
+);
+
+// S7 — Wholesale Top 15
+{% set ws_labels = d.top15_wholesale['Style'].tolist() %}
+{% set ws_values = d.top15_wholesale['value'].tolist() %}
+{% set ws_colors = [] %}
+{% for i in range(ws_labels|length) %}
+  {% set _ = ws_colors.append(bar_color_absolute(ws_labels[i], ws_values[i], true)) %}
+{% endfor %}
+mkH('s7chart',
+  {{ ws_labels | tojson }}.map((s,i)=> ({{ (d.top15_wholesale['Style'].isin(SILICONE_STYLES)|list) | tojson }}[i] ? s+' (S)' : s)),
+  {{ ws_values | tojson }},
+  {{ ws_colors | tojson }}
+);
+
+// S8 — Movement All
+{% set s8inc_labels = d.top10_increases['Style'].tolist() %}
+{% set s8inc_vals   = d.top10_increases['change'].tolist() %}
+{% set s8dec_labels = d.top10_decreases['Style'].tolist() %}
+{% set s8dec_vals   = d.top10_decreases['change'].tolist() %}
+mkV('s8inc', {{ s8inc_labels|tojson }}, {{ s8inc_vals|tojson }},
+  {{ s8inc_vals|tojson }}.map(v=>'rgba(244,67,54,0.6)'));
+mkV('s8dec', {{ s8dec_labels|tojson }}, {{ s8dec_vals|tojson }},
+  {{ s8dec_vals|tojson }}.map(v=>'rgba(76,175,80,0.6)'));
+
+// S9 — D2C Group movement
+{% set s9inc = d.movement_d2c.nlargest(10, 'change') %}
+{% set s9dec = d.movement_d2c.nsmallest(10, 'change') %}
+mkV('s9inc', {{ s9inc['Style'].tolist()|tojson }}, {{ s9inc['change'].tolist()|tojson }},
+  {{ s9inc['change'].tolist()|tojson }}.map(v=>'rgba(244,67,54,0.6)'));
+mkV('s9dec', {{ s9dec['Style'].tolist()|tojson }}, {{ s9dec['change'].tolist()|tojson }},
+  {{ s9dec['change'].tolist()|tojson }}.map(v=>'rgba(76,175,80,0.6)'));
+
+// S10 — Wholesale movement
+{% set s10inc = d.movement_wholesale.nlargest(10, 'change') %}
+{% set s10dec = d.movement_wholesale.nsmallest(10, 'change') %}
+mkV('s10inc', {{ s10inc['Style'].tolist()|tojson }}, {{ s10inc['change'].tolist()|tojson }},
+  {{ s10inc['change'].tolist()|tojson }}.map(v=>'rgba(244,67,54,0.6)'));
+mkV('s10dec', {{ s10dec['Style'].tolist()|tojson }}, {{ s10dec['change'].tolist()|tojson }},
+  {{ s10dec['change'].tolist()|tojson }}.map(v=>'rgba(76,175,80,0.6)'));
+
+// S11 — Category changes
+const catChanges = {{ cat_changes | tojson }};
+mkV('s11chart', CATS, catChanges,
+  catChanges.map(v => v>0 ? 'rgba(244,67,54,0.6)' : 'rgba(76,175,80,0.6)'));
+
+// S12 — D2C Group Top 15
+{% set d2c_labels = d.top15_d2c_group['Style'].tolist() %}
+{% set d2c_values = d.top15_d2c_group['value'].tolist() %}
+{% set d2c_colors = [] %}
+{% for i in range(d2c_labels|length) %}
+  {% set _ = d2c_colors.append(bar_color_absolute(d2c_labels[i], d2c_values[i])) %}
+{% endfor %}
+mkH('s12chart',
+  {{ d2c_labels|tojson }},
+  {{ d2c_values|tojson }},
+  {{ d2c_colors|tojson }}
+);
+
+// S16 — Location comparison
+const locOrder = {{ d.loc_order | tojson }};
+const locCurr = locOrder.map(l => ({ 'JD NJ': {{ d.curr_by_loc['JD NJ'] }}, 'JD ATL': {{ d.curr_by_loc['JD ATL'] }}, 'JD CA': {{ d.curr_by_loc['JD CA'] }}, 'Lateral TJ': {{ d.curr_by_loc['Lateral TJ'] }}, 'JD Canada': {{ d.curr_by_loc['JD Canada'] }}, 'JD UK': {{ d.curr_by_loc['JD UK'] }}, 'JD AU': {{ d.curr_by_loc['JD AU'] }}, 'JD SA': {{ d.curr_by_loc['JD SA'] }}, 'CHE CN': {{ d.curr_by_loc['CHE CN'] }} }[l]));
+const locPrev = locOrder.map(l => ({ 'JD NJ': {{ d.prev_by_loc['JD NJ'] }}, 'JD ATL': {{ d.prev_by_loc['JD ATL'] }}, 'JD CA': {{ d.prev_by_loc['JD CA'] }}, 'Lateral TJ': {{ d.prev_by_loc['Lateral TJ'] }}, 'JD Canada': {{ d.prev_by_loc['JD Canada'] }}, 'JD UK': {{ d.prev_by_loc['JD UK'] }}, 'JD AU': {{ d.prev_by_loc['JD AU'] }}, 'JD SA': {{ d.prev_by_loc['JD SA'] }}, 'CHE CN': {{ d.curr_by_loc['CHE CN'] }} }[l]));
+const locChg = locCurr.map((c,i) => c - locPrev[i]);
+const locPct = locChg.map((c,i) => locPrev[i] !== 0 ? c/locPrev[i]*100 : 0);
+const locColors = locChg.map((v,i) => {
+  const loc = locOrder[i];
+  const isUS = ['JD NJ','JD ATL','JD CA','Lateral TJ'].includes(loc);
+  return v >= 0
+    ? (isUS ? 'rgba(33,150,243,0.6)' : 'rgba(255,152,0,0.6)')
+    : 'rgba(76,175,80,0.6)';
+});
+
+mkV('s16abs', locOrder, locChg, locColors, '+K');
+mkV('s16pct', locOrder, locPct, locColors, '%');
+new Chart(document.getElementById('s16side'), {
+  type:'bar',
+  data:{labels:locOrder, datasets:[
+    {label:'{{ prev_label }}', data:locPrev, backgroundColor:'rgba(76,175,80,0.6)'},
+    {label:'{{ curr_label }}', data:locCurr, backgroundColor:'rgba(244,67,54,0.6)'}
+  ]},
+  options:{responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{position:'top'}, DL:{fmt:'K'}},
+    scales:{y:{ticks:{callback:v=>'$'+(v/1e3).toFixed(0)+'K'}}}}
+});
+
+// S17–S25: Per-location style increases
+{% for loc in d.loc_order %}
+{% set sidx = loop.index + 16 %}
+{% set inc_df = d.per_loc_increases[loc] %}
+{% if inc_df | length > 0 %}
+{% set inc_top10 = inc_df.nlargest(10, 'change') %}
+mkV('s{{ sidx }}chart',
+  {{ inc_top10['Style'].tolist() | tojson }},
+  {{ inc_top10['change'].tolist() | tojson }},
+  {{ inc_top10['change'].tolist() | tojson }}.map(v => v>=0 ? 'rgba(244,67,54,0.6)' : 'rgba(76,175,80,0.6)'),
+  '+K'
+);
+{% endif %}
+{% endfor %}
+
+// S26–S34: Per-location absolute values
+{% for loc in d.loc_order %}
+{% set sidx = loop.index + 25 %}
+{% set abs_df = d.per_loc_absolute[loc] %}
+{% if abs_df | length > 0 %}
+{% set abs_labels = abs_df['Style'].tolist() %}
+{% set abs_values = abs_df['value'].tolist() %}
+{% set abs_colors = [] %}
+{% for i in range(abs_labels|length) %}
+  {% set _ = abs_colors.append(bar_color_absolute(abs_labels[i], abs_values[i])) %}
+{% endfor %}
+mkH('s{{ sidx }}chart',
+  {{ abs_labels | tojson }},
+  {{ abs_values | tojson }},
+  {{ abs_colors | tojson }}
+);
+{% endif %}
+{% endfor %}
+
+</script>
+</body>
+</html>
