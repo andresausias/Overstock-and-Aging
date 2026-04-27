@@ -37,7 +37,7 @@ SILICONE_STYLES = set(
 
 KNOWN_CATEGORIES = ["D2C", "WHOLESALE", "EMP", "BAD LOT"]
 LOCATION_MARKET = {
-    "JD NJ": "US", "JD ATL": "US", "JD CA": "US", "Lateral TJ": "US",
+    "JD NJ": "US", "JD ATL": "US", "JD LA": "US", "Lateral TJ": "US",
     "JD Canada": "Int", "JD UK": "Int", "JD AU": "Int",
     "JD SA": "Int", "CHE CN": "Int",
 }
@@ -76,6 +76,7 @@ def load_filtered(path: Path) -> pd.DataFrame:
     df["Range TOTAL"] = df["Range TOTAL"].astype(str).str.strip()
     df["Category"] = df["Category"].astype(str).str.strip()
     df["Location"] = df["Location"].astype(str).str.strip()
+    df["Location"] = df["Location"].str.replace("JD CA", "JD LA", regex=False)
     df["Style"] = df["Style"].astype(str).str.strip()
     df["Seller Product SKU"] = df["Seller Product SKU"].astype(str).str.strip()
     return df

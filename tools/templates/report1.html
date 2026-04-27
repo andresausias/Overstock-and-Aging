@@ -524,6 +524,36 @@ const DL = {
 };
 Chart.register(DL);
 
+// ── Doughnut slice label plugin ───────────────────────────────────────────────
+const DoughnutLabel = {
+  id: 'DoughnutLabel',
+  afterDatasetsDraw(chart) {
+    if (chart.config.type !== 'doughnut' && chart.config.type !== 'pie') return;
+    const {ctx, data} = chart;
+    const meta = chart.getDatasetMeta(0);
+    const total = data.datasets[0].data.reduce((a, b) => a + b, 0);
+    meta.data.forEach((arc, i) => {
+      const val = data.datasets[0].data[i];
+      if (!val || val / total < 0.05) return; // skip tiny slices
+      const midAngle = (arc.startAngle + arc.endAngle) / 2;
+      const r = (arc.outerRadius + arc.innerRadius) / 2;
+      const x = arc.x + Math.cos(midAngle) * r;
+      const y = arc.y + Math.sin(midAngle) * r;
+      const pct = (val / total * 100).toFixed(1) + '%';
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 11px Arial';
+      ctx.fillText(data.labels[i], x, y - 7);
+      ctx.font = '10px Arial';
+      ctx.fillText(pct, x, y + 7);
+      ctx.restore();
+    });
+  }
+};
+Chart.register(DoughnutLabel);
+
 const mkH = (id, labels, values, colors, fmtMode='K') => new Chart(document.getElementById(id), {
   type:'bar',
   data:{labels, datasets:[{data:values, backgroundColor:colors, borderColor:colors.map(c=>c.replace('0.6','1')), borderWidth:1}]},
@@ -678,13 +708,13 @@ mkH('s12chart',
 
 // S16 — Location comparison
 const locOrder = {{ d.loc_order | tojson }};
-const locCurr = locOrder.map(l => ({ 'JD NJ': {{ d.curr_by_loc['JD NJ'] }}, 'JD ATL': {{ d.curr_by_loc['JD ATL'] }}, 'JD CA': {{ d.curr_by_loc['JD CA'] }}, 'Lateral TJ': {{ d.curr_by_loc['Lateral TJ'] }}, 'JD Canada': {{ d.curr_by_loc['JD Canada'] }}, 'JD UK': {{ d.curr_by_loc['JD UK'] }}, 'JD AU': {{ d.curr_by_loc['JD AU'] }}, 'JD SA': {{ d.curr_by_loc['JD SA'] }}, 'CHE CN': {{ d.curr_by_loc['CHE CN'] }} }[l]));
-const locPrev = locOrder.map(l => ({ 'JD NJ': {{ d.prev_by_loc['JD NJ'] }}, 'JD ATL': {{ d.prev_by_loc['JD ATL'] }}, 'JD CA': {{ d.prev_by_loc['JD CA'] }}, 'Lateral TJ': {{ d.prev_by_loc['Lateral TJ'] }}, 'JD Canada': {{ d.prev_by_loc['JD Canada'] }}, 'JD UK': {{ d.prev_by_loc['JD UK'] }}, 'JD AU': {{ d.prev_by_loc['JD AU'] }}, 'JD SA': {{ d.prev_by_loc['JD SA'] }}, 'CHE CN': {{ d.curr_by_loc['CHE CN'] }} }[l]));
+const locCurr = locOrder.map(l => ({ 'JD NJ': {{ d.curr_by_loc['JD NJ'] }}, 'JD ATL': {{ d.curr_by_loc['JD ATL'] }}, 'JD LA': {{ d.curr_by_loc['JD LA'] }}, 'Lateral TJ': {{ d.curr_by_loc['Lateral TJ'] }}, 'JD Canada': {{ d.curr_by_loc['JD Canada'] }}, 'JD UK': {{ d.curr_by_loc['JD UK'] }}, 'JD AU': {{ d.curr_by_loc['JD AU'] }}, 'JD SA': {{ d.curr_by_loc['JD SA'] }}, 'CHE CN': {{ d.curr_by_loc['CHE CN'] }} }[l]));
+const locPrev = locOrder.map(l => ({ 'JD NJ': {{ d.prev_by_loc['JD NJ'] }}, 'JD ATL': {{ d.prev_by_loc['JD ATL'] }}, 'JD LA': {{ d.prev_by_loc['JD LA'] }}, 'Lateral TJ': {{ d.prev_by_loc['Lateral TJ'] }}, 'JD Canada': {{ d.prev_by_loc['JD Canada'] }}, 'JD UK': {{ d.prev_by_loc['JD UK'] }}, 'JD AU': {{ d.prev_by_loc['JD AU'] }}, 'JD SA': {{ d.prev_by_loc['JD SA'] }}, 'CHE CN': {{ d.curr_by_loc['CHE CN'] }} }[l]));
 const locChg = locCurr.map((c,i) => c - locPrev[i]);
 const locPct = locChg.map((c,i) => locPrev[i] !== 0 ? c/locPrev[i]*100 : 0);
 const locColors = locChg.map((v,i) => {
   const loc = locOrder[i];
-  const isUS = ['JD NJ','JD ATL','JD CA','Lateral TJ'].includes(loc);
+  const isUS = ['JD NJ','JD ATL','JD LA','Lateral TJ'].includes(loc);
   return v >= 0
     ? (isUS ? 'rgba(33,150,243,0.6)' : 'rgba(255,152,0,0.6)')
     : 'rgba(76,175,80,0.6)';

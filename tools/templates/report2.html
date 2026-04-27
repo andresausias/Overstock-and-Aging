@@ -28,12 +28,12 @@
     background: #fff; border-radius: 12px; padding: 20px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.08);
   }
-  .summary-card.ext  { border-top: 4px solid #3b82f6; }
-  .summary-card.reg  { border-top: 4px solid #6366f1; }
-  .summary-card.sil  { border-top: 4px solid #9c27b0; }
-  .summary-card.bad  { border-top: 4px solid #ef4444; }
-  .summary-card.emp  { border-top: 4px solid #f59e0b; }
-  .summary-card.dis  { border-top: 4px solid #6b7280; }
+  .summary-card.ext      { border-top: 4px solid #3b82f6; }
+  .summary-card.new_labs { border-top: 4px solid #6366f1; }
+  .summary-card.old_labs { border-top: 4px solid #0ea5e9; }
+  .summary-card.sil      { border-top: 4px solid #9c27b0; }
+  .summary-card.bad_lot  { border-top: 4px solid #ef4444; }
+  .summary-card.emp_brand{ border-top: 4px solid #f59e0b; }
   .summary-card h3 { font-size: 13px; font-weight: 700; color: #374151; }
   .summary-card .val { font-size: 22px; font-weight: 700; color: #1a237e; margin: 8px 0 4px; }
   .summary-card .sub { font-size: 11px; color: #6b7280; }
@@ -45,18 +45,21 @@
     font-size: 10px; font-weight: 700; margin-left: 6px;
   }
   .badge-blue   { background:#dbeafe; color:#1d4ed8; }
+  .badge-indigo { background:#e0e7ff; color:#4338ca; }
+  .badge-sky    { background:#e0f2fe; color:#0369a1; }
   .badge-purple { background:#f3e8ff; color:#7e22ce; }
-  .badge-amber  { background:#fef3c7; color:#b45309; }
   .badge-red    { background:#fee2e2; color:#b91c1c; }
-  .badge-gray   { background:#f3f4f6; color:#4b5563; }
+  .badge-amber  { background:#fef3c7; color:#b45309; }
 
   /* Tables */
   table.st { width: 100%; border-collapse: collapse; font-size: 12px; }
   table.st thead tr {
     background: linear-gradient(135deg, #4a5568, #2d3748); color: #fff;
   }
-  table.st th { padding: 10px 12px; text-align: left; font-weight: 600; }
+  table.st th { padding: 10px 12px; text-align: left; font-weight: 600; white-space: nowrap; }
+  table.st th.r { text-align: right; }
   table.st td { padding: 8px 12px; border-bottom: 1px solid #f0f0f0; }
+  table.st td.r { text-align: right; }
   table.st tbody tr:nth-child(even) { background: #f9f9f9; }
   table.st tbody tr:hover { background: #e8f4fd; }
 
@@ -67,14 +70,13 @@
   }
 
   /* Charts */
-  .chart-wrap { position: relative; height: 420px; margin: 12px 0; }
-  .chart-wrap-lg { position: relative; height: 550px; margin: 12px 0; }
+  .chart-wrap-lg { position: relative; height: 520px; margin: 12px 0; }
 
   /* Insight boxes */
   .insight { background:#f0f7ff; border-left:4px solid #2196F3; border-radius:0 6px 6px 0; padding:12px 16px; margin-top:16px; font-size:13px; line-height:1.6; }
   .insight strong { color:#1565c0; }
-  .alert { background:#fff7ed; border-left:4px solid #f59e0b; border-radius:0 6px 6px 0; padding:12px 16px; margin-top:16px; font-size:13px; }
-  .crit  { background:#fef2f2; border-left:4px solid #ef4444; border-radius:0 6px 6px 0; padding:12px 16px; margin-top:16px; font-size:13px; }
+  .alert  { background:#fff7ed; border-left:4px solid #f59e0b; border-radius:0 6px 6px 0; padding:12px 16px; margin-top:16px; font-size:13px; }
+  .crit   { background:#fef2f2; border-left:4px solid #ef4444; border-radius:0 6px 6px 0; padding:12px 16px; margin-top:16px; font-size:13px; }
 
   /* Tabs */
   .tabs { display:flex; gap:4px; margin-bottom:16px; flex-wrap:wrap; }
@@ -87,15 +89,6 @@
   .tab-panel { display:none; }
   .tab-panel.active { display:block; }
 
-  /* KPI cards row */
-  .kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px; }
-  .kpi-card {
-    background:#f8f9fa; border-radius:8px; padding:14px; text-align:center;
-    border-left:4px solid #1a237e;
-  }
-  .kpi-card .kv { font-size:20px; font-weight:700; color:#1a237e; }
-  .kpi-card .kl { font-size:11px; color:#666; margin-top:3px; }
-
   .generated { text-align:right; font-size:11px; color:#999; padding:4px 0 16px; }
 </style>
 </head>
@@ -103,435 +96,173 @@
 
 <div class="page-header">
   <h1>Aged SKU Evacuation Analysis</h1>
-  <p>Generated {{ generated_at }} | Aged inventory = Over 365 + 270-365 days | All mandatory filters applied</p>
+  <p>Generated {{ generated_at }} &nbsp;|&nbsp; Scope: Over 365 days &nbsp;|&nbsp; Categories: D2C, EMP, BAD LOT &nbsp;|&nbsp; Segmentation: SKU_Segment.xlsx</p>
 </div>
 
 <div class="container">
 <p class="generated">{{ generated_at }}</p>
 
 {# ── Summary Cards ─────────────────────────────────────────────────────────── #}
+{% set seg_configs = [
+  ('ext',      'ext',      '10210 Extended (+)',           'badge-blue',   '+ SIZES'),
+  ('new_labs', 'new_labs', '10210 Regular — New Labs',     'badge-indigo', 'NEW LABS'),
+  ('old_labs', 'old_labs', '10210 Regular — Old Labs',     'badge-sky',    'OLD LABS'),
+  ('sil',      'sil',      '10400 Silicone Band',          'badge-purple', 'SILICONE'),
+  ('bad_lot',  'bad_lot',  'Bad Lot',                      'badge-red',    'BAD LOT'),
+  ('emp_brand','emp_brand','EMP Brand',                    'badge-amber',  'EMP'),
+] %}
+
 <div class="summary-grid">
-  {% set seg_configs = [
-    ('10210_extended', 'ext', '10210 Extended (+)', '+ SIZES'),
-    ('10210_regular',  'reg', '10210 Regular', 'REGULAR'),
-    ('10400',          'sil', '10400 (Silicone)', 'SILICONE BAND'),
-    ('bad_lot',        'bad', 'Bad Lot (All Styles)', 'BAD LOT'),
-    ('emp_brand',      'emp', '62001 EMP Brand', 'EMP'),
-    ('discontinued',   'dis', 'Discontinued', 'DISCONTINUED'),
-  ] %}
-  {% for seg_key, css_class, label, badge_text in seg_configs %}
+  {% for seg_key, css_cls, label, badge_cls, badge_txt in seg_configs %}
   {% set s = summaries[seg_key] %}
-  <div class="summary-card {{ css_class }}">
+  <div class="summary-card {{ css_cls }}">
     <h3>{{ label }}</h3>
     <div class="val">{{ fmt_val(s.total_valuation) }}</div>
-    <div class="sub">{{ "{:,}".format(s.total_aged_units) }} aged units</div>
+    <div class="sub">{{ "{:,}".format(s.total_aged_units) }} aged units (Over 365)</div>
     <div class="sub">{{ "{:,}".format(s.total_shipped) }} shipped YTD</div>
     <div class="stuck">⚠ {{ s.stuck_count }} SKUs stuck (&gt;52 wks)</div>
   </div>
   {% endfor %}
 </div>
 
-{# ── Section 1: 10210 Extended #}
+{# ── Macro: render one segment table ──────────────────────────────────────── #}
+{% macro seg_table(seg_key, section_num, title, badge_cls, badge_txt, note='') %}
 <div class="section">
   <div class="section-title">
-    Section 1 — Style 10210: Extended Sizes
-    <span class="badge badge-blue">+ SIZES</span>
+    Section {{ section_num }} — {{ title }}
+    <span class="badge {{ badge_cls }}">{{ badge_txt }}</span>
   </div>
   <div style="overflow-x:auto;">
   <table class="st">
     <thead><tr>
-      <th>#</th><th>SKU</th><th>Color</th><th>Size</th>
-      <th>Total Aged</th><th>Valuation</th>
-      <th>Shipped YTD</th><th>Wkly Avg</th><th>Weeks to Evac</th><th>Risk</th>
+      <th>#</th>
+      <th>SKU</th>
+      <th>Color</th>
+      <th>Size</th>
+      <th class="r">Total Aged</th>
+      <th class="r">Valuation</th>
+      <th class="r">Shipped YTD</th>
+      <th class="r">Wkly Avg</th>
+      <th class="r">Weeks to Evac</th>
+      <th>Risk</th>
     </tr></thead>
     <tbody>
-    {% for _, row in segments['10210_extended'].sort_values('Total Aged', ascending=False).iterrows() %}
+    {% for _, row in segments[seg_key].head(10).iterrows() %}
     {% set wte = row.get('weeks_to_evac', 9999) %}
-    {% set risk = weeks_to_risk(wte) %}
-    {% set rl = RISK_LABELS[risk] %}
+    {% set rl = RISK_LABELS[weeks_to_risk(wte)] %}
     <tr>
       <td>{{ loop.index }}</td>
-      <td>{{ row['Seller Product SKU']|replace('TRU-','')|replace('SHE-','')|replace('EMP-','') }}</td>
+      <td style="font-family:monospace;font-size:11px">{{ row['Seller Product SKU'] }}</td>
       <td>{{ row['Color'] }}</td>
       <td>{{ row['Size'] }}</td>
-      <td>{{ "{:,}".format(row['Total Aged']|int) }}</td>
-      <td>{{ fmt_val(row['Valuation']) }}</td>
-      <td>{{ "{:,}".format(row.get('shipped_ytd', 0)|int) }}</td>
-      <td>{{ "%.1f"|format(row.get('weekly_avg', 0)) }}</td>
-      <td>{% if wte == 9999 %}No Sales{% else %}{{ wte }}{% endif %}</td>
+      <td class="r">{{ "{:,}".format(row['Total Aged']|int) }}</td>
+      <td class="r">{{ fmt_val(row['Valuation']) }}</td>
+      <td class="r">{{ "{:,}".format(row.get('shipped_ytd', 0)|int) }}</td>
+      <td class="r">{{ "%.1f"|format(row.get('weekly_avg', 0)) }}</td>
+      <td class="r">{% if wte == 9999 %}—{% else %}{{ wte }}{% endif %}</td>
       <td><span class="risk" style="background:{{ rl[1] }};color:{{ rl[2] }};">{{ rl[0] }}</span></td>
     </tr>
+    {% else %}
+    <tr><td colspan="10" style="text-align:center;color:#999;padding:16px;">No aged SKUs found for this segment.</td></tr>
     {% endfor %}
     </tbody>
   </table>
   </div>
-  <div class="insight"><strong>Key Insight:</strong>
-    Extended sizes (M+, L+, XL+, 2XL+) represent slow-moving sizes.
-    {{ summaries['10210_extended'].stuck_count }} SKUs have no viable evacuation path (&gt;52 weeks).
-  </div>
+  {% if note %}<div class="{{ 'crit' if 'Bad Lot' in title else 'insight' }}">{{ note }}</div>{% endif %}
 </div>
+{% endmacro %}
 
-{# ── Section 2: 10210 Regular #}
-<div class="section">
-  <div class="section-title">
-    Section 2 — Style 10210: Regular Sizes
-    <span class="badge badge-blue">REGULAR</span>
-  </div>
-  <div style="overflow-x:auto;">
-  <table class="st">
-    <thead><tr>
-      <th>#</th><th>SKU</th><th>Color</th><th>Size</th>
-      <th>Total Aged</th><th>Valuation</th>
-      <th>Shipped YTD</th><th>Wkly Avg</th><th>Weeks to Evac</th><th>Risk</th>
-    </tr></thead>
-    <tbody>
-    {% for _, row in segments['10210_regular'].sort_values('Total Aged', ascending=False).head(15).iterrows() %}
-    {% set wte = row.get('weeks_to_evac', 9999) %}
-    {% set risk = weeks_to_risk(wte) %}
-    {% set rl = RISK_LABELS[risk] %}
-    <tr>
-      <td>{{ loop.index }}</td>
-      <td>{{ row['Seller Product SKU']|replace('TRU-','')|replace('SHE-','') }}</td>
-      <td>{{ row['Color'] }}</td>
-      <td>{{ row['Size'] }}</td>
-      <td>{{ "{:,}".format(row['Total Aged']|int) }}</td>
-      <td>{{ fmt_val(row['Valuation']) }}</td>
-      <td>{{ "{:,}".format(row.get('shipped_ytd', 0)|int) }}</td>
-      <td>{{ "%.1f"|format(row.get('weekly_avg', 0)) }}</td>
-      <td>{% if wte == 9999 %}No Sales{% else %}{{ wte }}{% endif %}</td>
-      <td><span class="risk" style="background:{{ rl[1] }};color:{{ rl[2] }};">{{ rl[0] }}</span></td>
-    </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-  </div>
-</div>
+{# ── Sections 1–6 ─────────────────────────────────────────────────────────── #}
+{{ seg_table('ext',      1, '10210 Extended (+)',       'badge-blue',   '+ SIZES',
+   '<strong>Note:</strong> Extended sizes (M+, L+, XL+, 2XL+). ' ~ summaries.ext.stuck_count|string ~ ' SKUs with no viable evacuation path (>52 weeks).') }}
 
-{# ── Section 3: 10400 Silicone #}
-<div class="section">
-  <div class="section-title">
-    Section 3 — Style 10400
-    <span class="badge badge-purple">SILICONE BAND</span>
-  </div>
-  <div style="overflow-x:auto;">
-  <table class="st">
-    <thead><tr>
-      <th>#</th><th>SKU</th><th>Color</th><th>Size</th>
-      <th>Total Aged</th><th>Valuation</th>
-      <th>Shipped YTD</th><th>Wkly Avg</th><th>Weeks to Evac</th><th>Risk</th>
-    </tr></thead>
-    <tbody>
-    {% for _, row in segments['10400'].sort_values('Total Aged', ascending=False).head(15).iterrows() %}
-    {% set wte = row.get('weeks_to_evac', 9999) %}
-    {% set risk = weeks_to_risk(wte) %}
-    {% set rl = RISK_LABELS[risk] %}
-    <tr>
-      <td>{{ loop.index }}</td>
-      <td>{{ row['Seller Product SKU'] }}</td>
-      <td>{{ row['Color'] }}</td>
-      <td>{{ row['Size'] }}</td>
-      <td>{{ "{:,}".format(row['Total Aged']|int) }}</td>
-      <td>{{ fmt_val(row['Valuation']) }}</td>
-      <td>{{ "{:,}".format(row.get('shipped_ytd', 0)|int) }}</td>
-      <td>{{ "%.1f"|format(row.get('weekly_avg', 0)) }}</td>
-      <td>{% if wte == 9999 %}No Sales{% else %}{{ wte }}{% endif %}</td>
-      <td><span class="risk" style="background:{{ rl[1] }};color:{{ rl[2] }};">{{ rl[0] }}</span></td>
-    </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-  </div>
-  <div class="alert"><strong>Note:</strong> Silicone band styles flagged across all sections. Purple treatment in charts.</div>
-</div>
+{{ seg_table('new_labs', 2, '10210 Regular — New Labs', 'badge-indigo', 'NEW LABS') }}
 
-{# ── Section 4: Bad Lot #}
-<div class="section">
-  <div class="section-title">
-    Section 4 — Bad Lot (All Styles)
-    <span class="badge badge-red">BAD LOT</span>
-  </div>
-  <div style="overflow-x:auto;">
-  <table class="st">
-    <thead><tr>
-      <th>#</th><th>SKU</th><th>Style</th><th>Color</th><th>Size</th>
-      <th>Total Aged</th><th>Valuation</th>
-      <th>Shipped YTD</th><th>Wkly Avg</th><th>Weeks to Evac</th><th>Risk</th>
-    </tr></thead>
-    <tbody>
-    {% for _, row in segments['bad_lot'].sort_values('Total Aged', ascending=False).head(20).iterrows() %}
-    {% set wte = row.get('weeks_to_evac', 9999) %}
-    {% set risk = weeks_to_risk(wte) %}
-    {% set rl = RISK_LABELS[risk] %}
-    <tr>
-      <td>{{ loop.index }}</td>
-      <td>{{ row['Seller Product SKU'] }}</td>
-      <td>{{ row['Style'] }}</td>
-      <td>{{ row['Color'] }}</td>
-      <td>{{ row['Size'] }}</td>
-      <td>{{ "{:,}".format(row['Total Aged']|int) }}</td>
-      <td>{{ fmt_val(row['Valuation']) }}</td>
-      <td>{{ "{:,}".format(row.get('shipped_ytd', 0)|int) }}</td>
-      <td>{{ "%.1f"|format(row.get('weekly_avg', 0)) }}</td>
-      <td>{% if wte == 9999 %}No Sales{% else %}{{ wte }}{% endif %}</td>
-      <td><span class="risk" style="background:{{ rl[1] }};color:{{ rl[2] }};">{{ rl[0] }}</span></td>
-    </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-  </div>
-  <div class="crit"><strong>Critical:</strong> Bad lot inventory has limited evacuation channels. Assess for write-off or liquidation.</div>
-</div>
+{{ seg_table('old_labs', 3, '10210 Regular — Old Labs', 'badge-sky',    'OLD LABS') }}
 
-{# ── Section 5: EMP Brand 62001 #}
-<div class="section">
-  <div class="section-title">
-    Section 5 — Empetua (EMP) Brand — Style 62001
-    <span class="badge badge-amber">EMP</span>
-  </div>
-  <div style="overflow-x:auto;">
-  <table class="st">
-    <thead><tr>
-      <th>#</th><th>SKU</th><th>Color</th><th>Size</th>
-      <th>Total Aged</th><th>Valuation</th>
-      <th>Shipped YTD</th><th>Wkly Avg</th><th>Weeks to Evac</th><th>Risk</th>
-    </tr></thead>
-    <tbody>
-    {% for _, row in segments['emp_brand'].sort_values('Total Aged', ascending=False).iterrows() %}
-    {% set wte = row.get('weeks_to_evac', 9999) %}
-    {% set risk = weeks_to_risk(wte) %}
-    {% set rl = RISK_LABELS[risk] %}
-    <tr>
-      <td>{{ loop.index }}</td>
-      <td>{{ row['Seller Product SKU']|replace('EMP-','') }}</td>
-      <td>{{ row['Color'] }}</td>
-      <td>{{ row['Size'] }}</td>
-      <td>{{ "{:,}".format(row['Total Aged']|int) }}</td>
-      <td>{{ fmt_val(row['Valuation']) }}</td>
-      <td>{{ "{:,}".format(row.get('shipped_ytd', 0)|int) }}</td>
-      <td>{{ "%.1f"|format(row.get('weekly_avg', 0)) }}</td>
-      <td>{% if wte == 9999 %}No Sales{% else %}{{ wte }}{% endif %}</td>
-      <td><span class="risk" style="background:{{ rl[1] }};color:{{ rl[2] }};">{{ rl[0] }}</span></td>
-    </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-  </div>
-</div>
+{{ seg_table('sil',      4, '10400 Silicone Band',      'badge-purple', 'SILICONE') }}
 
-{# ── Section 6: Discontinued #}
-<div class="section">
-  <div class="section-title">
-    Section 6 — Discontinued MKT Strategy
-    <span class="badge badge-gray">DISCONTINUED</span>
-  </div>
-  <div style="overflow-x:auto;">
-  <table class="st">
-    <thead><tr>
-      <th>#</th><th>SKU</th><th>Style</th><th>Color</th><th>Size</th>
-      <th>Total Aged</th><th>Valuation</th>
-      <th>Shipped YTD</th><th>Wkly Avg</th><th>Weeks to Evac</th><th>Risk</th>
-    </tr></thead>
-    <tbody>
-    {% for _, row in segments['discontinued'].sort_values('Total Aged', ascending=False).head(20).iterrows() %}
-    {% set wte = row.get('weeks_to_evac', 9999) %}
-    {% set risk = weeks_to_risk(wte) %}
-    {% set rl = RISK_LABELS[risk] %}
-    <tr>
-      <td>{{ loop.index }}</td>
-      <td>{{ row['Seller Product SKU'] }}</td>
-      <td>{{ row['Style'] }}</td>
-      <td>{{ row['Color'] }}</td>
-      <td>{{ row['Size'] }}</td>
-      <td>{{ "{:,}".format(row['Total Aged']|int) }}</td>
-      <td>{{ fmt_val(row['Valuation']) }}</td>
-      <td>{{ "{:,}".format(row.get('shipped_ytd', 0)|int) }}</td>
-      <td>{{ "%.1f"|format(row.get('weekly_avg', 0)) }}</td>
-      <td>{% if wte == 9999 %}No Sales{% else %}{{ wte }}{% endif %}</td>
-      <td><span class="risk" style="background:{{ rl[1] }};color:{{ rl[2] }};">{{ rl[0] }}</span></td>
-    </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-  </div>
-</div>
+{{ seg_table('bad_lot',  5, 'Bad Lot',                  'badge-red',    'BAD LOT',
+   '<strong>Critical:</strong> Bad lot inventory has limited evacuation channels. Assess for write-off or liquidation.') }}
 
-{# ── Section 7: Critical — Slow Evacuation by Valuation #}
-<div class="section">
-  <div class="section-title">Section 7 — Critical: Top Slow-Evacuation SKUs by Valuation</div>
-  <div class="kpi-row">
-    {# all_skus intentionally removed — index concat not supported in Jinja2/pandas #}
-    <div class="kpi-card"><div class="kv">Review below</div><div class="kl">Total At Risk (&gt;10 wks)</div></div>
-    <div class="kpi-card"><div class="kv">{{ summaries.values()|map(attribute='stuck_count')|sum }}</div><div class="kl">Stuck SKUs (&gt;52 wks)</div></div>
-    <div class="kpi-card"><div class="kv">Slow/No Sales</div><div class="kl">Segments: All 6</div></div>
-    <div class="kpi-card"><div class="kv">≥ $1M+</div><div class="kl">Cumulative At-Risk Value</div></div>
-  </div>
-  <div class="insight">
-    <strong>Key Insight:</strong>
-    SKUs with &gt;10 weeks to evacuation and highest dollar valuations require immediate escalation.
-    Stuck SKUs (&gt;52 weeks) should be reviewed for liquidation or write-off.
-  </div>
-</div>
+{{ seg_table('emp_brand',6, 'EMP Brand',                'badge-amber',  'EMP') }}
 
-{# ── Section 8: Weekly Sales Trend (tabbed) #}
+{# ── Section 7: Weekly Sales Trend (tabbed) ───────────────────────────────── #}
 <div class="section">
-  <div class="section-title">Section 8 — Weekly Sales Trend per SKU</div>
+  <div class="section-title">Section 7 — Weekly Sales Trend per SKU</div>
   {% if shipments is not none %}
-  <div class="tabs" id="s8tabs">
-    {% for seg_key, _, label, _ in [
-      ('10210_extended','','10210 Extended',''),
-      ('10210_regular','','10210 Regular',''),
-      ('10400','','10400',''),
-      ('bad_lot','','Bad Lot',''),
-      ('emp_brand','','EMP Brand',''),
-      ('discontinued','','Discontinued',''),
-    ] %}
+  <div class="tabs" id="s7tabs">
+    {% for seg_key, _, label, _, _ in seg_configs %}
     <button class="tab-btn {% if loop.first %}active{% endif %}"
-      onclick="showS8Tab('{{ seg_key }}', this)">{{ label }}</button>
+      onclick="showS7Tab('{{ seg_key }}', this)">{{ label }}</button>
     {% endfor %}
   </div>
-  {% for seg_key, _, label, _ in [
-    ('10210_extended','','10210 Extended',''),
-    ('10210_regular','','10210 Regular',''),
-    ('10400','','10400',''),
-    ('bad_lot','','Bad Lot',''),
-    ('emp_brand','','EMP Brand',''),
-    ('discontinued','','Discontinued',''),
-  ] %}
-  <div class="tab-panel {% if loop.first %}active{% endif %}" id="s8_{{ seg_key }}">
-    <div class="chart-wrap-lg"><canvas id="s8chart_{{ seg_key }}"></canvas></div>
+  {% for seg_key, _, label, _, _ in seg_configs %}
+  <div class="tab-panel {% if loop.first %}active{% endif %}" id="s7_{{ seg_key }}">
+    <div class="chart-wrap-lg"><canvas id="s7chart_{{ seg_key }}"></canvas></div>
   </div>
   {% endfor %}
   {% else %}
-  <div class="alert">Weekly shipment data not available. Upload a shipment file to .tmp/raw/ and re-run.</div>
+  <div class="alert">Weekly shipment data not available. Run process_shipments.py first.</div>
   {% endif %}
-</div>
-
-{# ── Section 9: Evacuation Map (Bubble) #}
-<div class="section">
-  <div class="section-title">Section 9 — Evacuation Map (Sales Velocity vs. Aged Units)</div>
-  <div style="position:relative;height:550px;"><canvas id="s9bubble"></canvas></div>
-  <div class="insight">
-    <strong>Key Insight:</strong>
-    Top-left = High Risk (high aged units, low sales velocity).
-    Bottom-right = On Track (low aged units, high velocity).
-    Bubble size represents dollar valuation.
-  </div>
-</div>
-
-{# ── Section 10: Size Curve Check #}
-<div class="section">
-  <div class="section-title">Section 10 — Full Size Curve Check</div>
-  <div class="insight">
-    <strong>Key Insight:</strong>
-    Size curve analysis compares actual in-stock distribution vs. historical consumption curve.
-    Deviation &gt; -10% per size flags a breaking size. Upload size curve reference data to enable this section.
-  </div>
 </div>
 
 </div>{# end container #}
 
 <script>
-// Tab switcher for S8
-function showS8Tab(segKey, btn) {
-  document.querySelectorAll('#s8tabs .tab-btn').forEach(b => b.classList.remove('active'));
+function showS7Tab(segKey, btn) {
+  document.querySelectorAll('#s7tabs .tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   btn.classList.add('active');
-  document.getElementById('s8_' + segKey).classList.add('active');
+  document.getElementById('s7_' + segKey).classList.add('active');
 }
 
-// ── Chart.js data ──────────────────────────────────────────────────────────
 {% if shipments is not none %}
 const weekLabels = {{ wk_cols | tojson }};
 
-{% for seg_key, _, label, _ in [
-  ('10210_extended','','10210 Extended',''),
-  ('10210_regular','','10210 Regular',''),
-  ('10400','','10400',''),
-  ('bad_lot','','Bad Lot',''),
-  ('emp_brand','','EMP Brand',''),
-  ('discontinued','','Discontinued',''),
-] %}
-{% set seg_df = segments[seg_key].head(10) %}
-new Chart(document.getElementById('s8chart_{{ seg_key }}'), {
-  type: 'line',
-  data: {
-    labels: weekLabels,
-    datasets: [
-    {% for _, row in seg_df.iterrows() %}
-      {
-        label: '{{ row["Seller Product SKU"] }}',
-        data: {{ row.get('weekly_detail', []) | tojson }},
+const CHART_COLORS = [
+  '#3b82f6','#ef4444','#10b981','#f59e0b','#8b5cf6',
+  '#ec4899','#06b6d4','#84cc16','#f97316','#6366f1'
+];
+
+{% for seg_key, _, label, _, _ in seg_configs %}
+(function(){
+  const top10 = [
+    {% for _, row in segments[seg_key].head(10).iterrows() %}
+    { label: '{{ row["Seller Product SKU"] }}', data: {{ row.get('weekly_detail', []) | tojson }} },
+    {% endfor %}
+  ];
+  new Chart(document.getElementById('s7chart_{{ seg_key }}'), {
+    type: 'line',
+    data: {
+      labels: weekLabels,
+      datasets: top10.map((d, i) => ({
+        label: d.label,
+        data: d.data,
+        borderColor: CHART_COLORS[i % CHART_COLORS.length],
+        backgroundColor: CHART_COLORS[i % CHART_COLORS.length] + '22',
         fill: false,
         tension: 0.3,
         pointRadius: 3,
+        borderWidth: 2,
+      }))
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right', labels: { font: { size: 10 }, boxWidth: 12 } },
+        title: { display: true, text: '{{ label }} — Top 10 SKUs by Aged Units', font: { size: 13 } }
       },
-    {% endfor %}
-    ]
-  },
-  options: {
-    responsive: true, maintainAspectRatio: false,
-    plugins: { legend: { position: 'right' } },
-    scales: { y: { beginAtZero: true, title: { display: true, text: 'Units Shipped' } } }
-  }
-});
+      scales: {
+        y: { beginAtZero: true, title: { display: true, text: 'Units Shipped' } },
+        x: { title: { display: true, text: 'Week' } }
+      }
+    }
+  });
+})();
 {% endfor %}
 {% endif %}
-
-// ── S9: Bubble chart ───────────────────────────────────────────────────────
-const segColors = {
-  '10210_extended': 'rgba(59,130,246,0.7)',
-  '10210_regular':  'rgba(99,102,241,0.7)',
-  '10400':          'rgba(156,39,176,0.7)',
-  'bad_lot':        'rgba(239,68,68,0.7)',
-  'emp_brand':      'rgba(245,158,11,0.7)',
-  'discontinued':   'rgba(107,114,128,0.7)',
-};
-
-const bubbleDatasets = [
-{% for seg_key, _, label, _ in [
-  ('10210_extended','','10210 Extended',''),
-  ('10210_regular','','10210 Regular',''),
-  ('10400','','10400',''),
-  ('bad_lot','','Bad Lot',''),
-  ('emp_brand','','EMP Brand',''),
-  ('discontinued','','Discontinued',''),
-] %}
-{
-  label: '{{ label }}',
-  backgroundColor: segColors['{{ seg_key }}'],
-  data: [
-    {% for _, row in segments[seg_key].head(20).iterrows() %}
-    {
-      x: {{ row.get('weekly_avg', 0) | round(1) }},
-      y: {{ row['Total Aged'] | int }},
-      r: Math.max(4, Math.min(30, Math.sqrt({{ row['Valuation'] | round(0) }} / 1000))),
-      sku: '{{ row["Seller Product SKU"] }}'
-    },
-    {% endfor %}
-  ]
-},
-{% endfor %}
-];
-
-new Chart(document.getElementById('s9bubble'), {
-  type: 'bubble',
-  data: { datasets: bubbleDatasets },
-  options: {
-    responsive: true, maintainAspectRatio: false,
-    plugins: {
-      legend: { position: 'right' },
-      tooltip: {
-        callbacks: {
-          label: ctx => `${ctx.raw.sku}: ${ctx.parsed.y} aged units @ ${ctx.parsed.x.toFixed(1)} wkly avg`
-        }
-      }
-    },
-    scales: {
-      x: { title: { display: true, text: 'Weekly Sales Velocity (units/wk)' }, beginAtZero: true },
-      y: { title: { display: true, text: 'Aged Units' }, beginAtZero: true }
-    }
-  }
-});
 </script>
 </body>
 </html>

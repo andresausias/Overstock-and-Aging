@@ -37,7 +37,7 @@ LOCATION_TOLERANCE = 100.0  # dollars
 
 KNOWN_CATEGORIES = {"D2C", "WHOLESALE", "EMP", "BAD LOT"}
 KNOWN_LOCATIONS = {
-    "JD NJ", "JD ATL", "JD CA", "Lateral TJ",
+    "JD NJ", "JD ATL", "JD LA", "Lateral TJ",
     "JD Canada", "JD UK", "JD AU", "JD SA", "CHE CN"
 }
 

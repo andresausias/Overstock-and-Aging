@@ -1,14 +1,15 @@
 {
   "_comment": "Update this file every week before running generate_slides.js.",
-  "report_date": "Mar 26, 2026",
-  "week_current": 12,
-  "week_labels": ["WK1","WK2","WK3","WK4","WK5","WK6","WK7","WK8","WK9","WK10","WK11","WK12"],
+  "report_date": "Apr 11, 2026",
+  "week_current": 14,
+  "week_labels": ["WK1","WK2","WK3","WK4","WK5","WK6","WK7","WK8","WK9","WK10","WK11","WK12","WK13","WK14"],
   "week_date_ranges": [
     "Jan 4-10","Jan 11-17","Jan 18-24","Jan 25-31",
     "Feb 1-7","Feb 8-14","Feb 15-21","Feb 22-28",
-    "Mar 1-7","Mar 8-14","Mar 15-21","Mar 22-28"
+    "Mar 1-7","Mar 8-14","Mar 15-21","Mar 22-28",
+    "Mar 29-Apr 4","Apr 5-11"
   ],
-  "num_weeks": 12,
+  "num_weeks": 14,
   "overstock_valuation": 21700000,
   "overstock_units": 4602646,
   "total_inventory_denominator": 50935732,

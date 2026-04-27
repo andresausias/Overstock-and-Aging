@@ -165,8 +165,10 @@ def main():
         print("ERROR: No shipment file found in input/shipments/")
         sys.exit(1)
 
+    # Use the most recently modified file
+    shipment_files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
     ship_file = shipment_files[0]
-    print(f"\nLoading shipments: {ship_file.name}")
+    print(f"\nLoading shipments: {ship_file.name} ({len(shipment_files)} file(s) found, using newest)")
     if ship_file.suffix.lower() == ".csv":
         df = pd.read_csv(ship_file)
     else:

@@ -27,7 +27,7 @@ python tools/validate_inventory.py
 
 **If it fails:**
 1. Look at the diff in the console output — which locations don't add up?
-2. Check for new warehouse codes not in the standard 9 (`JD NJ`, `JD ATL`, `JD CA`, `Lateral TJ`, `JD Canada`, `JD UK`, `JD AU`, `JD SA`, `CHE CN`)
+2. Check for new warehouse codes not in the standard 9 (`JD NJ`, `JD ATL`, `JD LA`, `Lateral TJ`, `JD Canada`, `JD UK`, `JD AU`, `JD SA`, `CHE CN`)
 3. If a new location is legitimate, add it to `KNOWN_LOCATIONS` in `validate_inventory.py` and update the workflow
 
 ## Output
